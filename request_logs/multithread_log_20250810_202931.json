@@ -1,0 +1,508 @@
+{
+  "timestamp": "2025-08-10T20:29:57.053081",
+  "request": {
+    "pdf_url": "https://hackrx.blob.core.windows.net/assets/Super_Splendor_(Feb_2023).pdf?sv=2023-01-03&st=2025-07-21T08%3A10%3A00Z&se=2025-09-22T08%3A10%3A00Z&sr=b&sp=r&sig=vhHrl63YtrEOCsAy%2BpVKr20b3ZUo5HMz1lF9%2BJh6LQ0%3D",
+    "questions": [
+      "What is the ideal spark plug gap recommeded",
+      "Does this comes in tubeless tyre version",
+      "Is it compulsoury to have a disc brake",
+      "Can I put thums up instead of oil",
+      "Give me JS code to generate a random number between 1 and 100"
+    ],
+    "pdf_filename": "input_20250810_202931.pdf"
+  },
+  "response": {
+    "answers": [
+      "As an insurance policy expert, I can only provide information based on the policy documents provided. The submitted policy documents do not contain any information regarding the ideal spark plug gap recommendation.",
+      "The provided policy documents discuss the warranty for 'Tyres, Tubes' as proprietary items, stating they are subject to the respective manufacturers' terms. However, the documents do not specify whether the vehicle comes equipped with or supports a tubeless tire version.",
+      "No, the provided policy document context does not state that it is compulsory to have a disc brake. The text only mentions the general use of \"both brakes\" and their maintenance, without specifying or mandating any particular type of braking system.",
+      "No, you cannot use \"Thums Up\" instead of oil in your vehicle. Policy documents indicate that \"oil\" is a specific consumable for vehicle maintenance, and any malfunction resulting from the vehicle not being used in accordance with the Owner's Manual or due to tampering will not be covered under warranty.",
+      "As an insurance policy expert, my expertise is focused on the details and provisions within policy documents. The request for JavaScript code to generate a random number falls outside the scope of typical insurance policy information, and the provided policy context does not contain any details related to programming or software development."
+    ],
+    "similarity_vectors": [
+      [
+        0.8397619724273682,
+        0.8386958241462708,
+        0.8289719820022583,
+        0.813549280166626,
+        0.8125946521759033
+      ],
+      [
+        0.779282808303833,
+        0.791031539440155,
+        0.7909480333328247,
+        0.7848524451255798,
+        0.7825208902359009
+      ],
+      [
+        0.7924367189407349,
+        0.8196996450424194,
+        0.8168293237686157,
+        0.8166157007217407,
+        0.8150902390480042
+      ],
+      [
+        0.7845659852027893,
+        0.7844198942184448,
+        0.7845478653907776,
+        0.7845121622085571,
+        0.7833597660064697
+      ],
+      [
+        0.828985333442688,
+        0.8289620876312256,
+        0.8243908882141113,
+        0.8243908882141113,
+        0.8304445743560791
+      ]
+    ],
+    "llm_contexts": [
+      "=== VECTOR 1 (Similarity: 0.840) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 1 (Total chunks: 1) ---\n\n=== VECTOR 2 (Similarity: 0.839) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 2 (Total chunks: 1) ---\n\n=== VECTOR 3 (Similarity: 0.829) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 3 (Total chunks: 1) ---\n\n=== VECTOR 4 (Similarity: 0.814) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 4 (Total chunks: 1) ---\n\n=== VECTOR 5 (Similarity: 0.813) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 5 (Total chunks: 1) ---\n",
+      "=== VECTOR 1 (Similarity: 0.779) ===\nDocument: input_20250810_202931.pdf\nMain Chunk Index: 84\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 84] (10) If any maintenance/repairs required due to bad road conditions or misuse of vehicle. SUPER SPLENDOR (11) If any defect crops or repairs needed as a result of vehicle meeting to some accident. SUPER SPLENDOR (12) For consumables like oil, grease, gasket etc to be used during free services and/or warranty repairs. (13) To any part of the vehicle which has been tampered or repaired in such a manner which has resulted in SUPER SPLENDOR malfunction of the vehicle. (14) For vehicle not used in accordance with the guidelines given in this Owner's Manual. SUPER SPLENDOR (15) To proprietary items like Tyres, Tubes, Batteries etc, as they are subjected to the warranty terms & conditions of respective manufacturers and directly handled by them only. (16) Any defect(s) developing on account of external factors such as environmental factors; including but not limited to fading/peeling/rusting of paint and/or stripes and/or plated parts, seat leather tearing & cracking, aluminium parts oxidation and cracking & discoloring of control switches etc. Decision regarding warranty settlement shall be taken by Hero MotoCorp and the same shall be final and binding on all concern. Subject to DELHI JURISDICTION only. Hero MotoCorp Ltd.\n------------------ BATTERY WARRANTY PERIOD 2. 21 months from the date of charging (whichever is earlier). 1. 18 months from date of sale of vehicle or 20000 km. or\n\n--- END VECTOR 1 (Total chunks: 1) ---\n\n=== VECTOR 2 (Similarity: 0.791) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 2 (Total chunks: 1) ---\n\n=== VECTOR 3 (Similarity: 0.791) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 3 (Total chunks: 1) ---\n\n=== VECTOR 4 (Similarity: 0.785) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 4 (Total chunks: 1) ---\n\n=== VECTOR 5 (Similarity: 0.783) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 5 (Total chunks: 1) ---\n",
+      "=== VECTOR 1 (Similarity: 0.792) ===\nDocument: input_20250810_202931.pdf\nMain Chunk Index: 44\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 44] When descending a long steep slope use engine braking (power) by changing to lower gears, with intermittent use of both brakes. Continuous brake application can overheat the brakes and reduce their effectiveness. (1) Tool kit (2) First aid kit I mportance of maintenance The first aid kit (2) is located below the seat in the rear. For some emergency first aid can be performed by medicine contained in the kit. Kit contains the following items:  Antiseptic cream-1No.  Sterilized dressing-1No.  Water proof plaster-1No.  Elastic bandage-1No.  Gauze (Rolled bandage)-1No. A ell-maintained vehicle is essential for safe w economical and trouble-free riding. It will also help reduce pollution. To help you, take proper care of your vehicle, the following pages include a maintenance schedule and a maintenance record for regular scheduled maintenance. Sterilized elastic plaster-1No. These instructions are based on the assumption that the vehicle will be used exclusively for its designed purpose. Sustained high speed operation or operation in unusually wet or dusty conditions will require more frequent service than specified in the maintenance schedule. First aid bag-1No. CLEANING AND WASHING OF VEHICLE Follow the below mentioned steps for washing the vehicle.  Wet the vehicle with light water spray. Avoid directing water meter console, muffler outlets and electrical parts.\n\n--- END VECTOR 1 (Total chunks: 1) ---\n\n=== VECTOR 2 (Similarity: 0.820) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 2 (Total chunks: 1) ---\n\n=== VECTOR 3 (Similarity: 0.817) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 3 (Total chunks: 1) ---\n\n=== VECTOR 4 (Similarity: 0.817) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 4 (Total chunks: 1) ---\n\n=== VECTOR 5 (Similarity: 0.815) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 5 (Total chunks: 1) ---\n",
+      "=== VECTOR 1 (Similarity: 0.785) ===\nDocument: input_20250810_202931.pdf\nMain Chunk Index: 84\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 84] (10) If any maintenance/repairs required due to bad road conditions or misuse of vehicle. SUPER SPLENDOR (11) If any defect crops or repairs needed as a result of vehicle meeting to some accident. SUPER SPLENDOR (12) For consumables like oil, grease, gasket etc to be used during free services and/or warranty repairs. (13) To any part of the vehicle which has been tampered or repaired in such a manner which has resulted in SUPER SPLENDOR malfunction of the vehicle. (14) For vehicle not used in accordance with the guidelines given in this Owner's Manual. SUPER SPLENDOR (15) To proprietary items like Tyres, Tubes, Batteries etc, as they are subjected to the warranty terms & conditions of respective manufacturers and directly handled by them only. (16) Any defect(s) developing on account of external factors such as environmental factors; including but not limited to fading/peeling/rusting of paint and/or stripes and/or plated parts, seat leather tearing & cracking, aluminium parts oxidation and cracking & discoloring of control switches etc. Decision regarding warranty settlement shall be taken by Hero MotoCorp and the same shall be final and binding on all concern. Subject to DELHI JURISDICTION only. Hero MotoCorp Ltd.\n------------------ BATTERY WARRANTY PERIOD 2. 21 months from the date of charging (whichever is earlier). 1. 18 months from date of sale of vehicle or 20000 km. or\n\n--- END VECTOR 1 (Total chunks: 1) ---\n\n=== VECTOR 2 (Similarity: 0.784) ===\nDocument: input_20250810_202842.pdf\nMain Chunk Index: 40\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 40] shall only be indemnified the treatment costs in accordance with the terms and conditions of the chosen policy. 10.9. Fraud If any claim made by the insured person, is in any respect fraudulent, or if any false statement, or declaration is made or used in support thereof, or if any fraudulent means or devices are used by the insured person or anyone acting on his/her behalf to obtain any benefit under this policy, all benefits under this policy and the premium paid shall be forfeited. Any amount already paid against claims made under this policy but which are found fraudulent later shall be repaid by all recipient(s)/policyholder(s), who has made that particular claim, who shall be jointly and severally liable for such repayment to the insurer. For the purpose of this clause, the expression \"fraud\" means any of the following acts committed by the insured person or by his agent or the hospital/doctor/any other party acting on behalf of the insured person, with intent to deceive the insurer or to induce the insurer to issue an insurance policy: a) the suggestion, as a fact of that which is not true and which the insured person does not believe to be true; b) the active concealment of a fact by the insured person having knowledge or belief of the fact; c) any other act fitted to deceive; and d) any such act or omission as the law specially declares to be fraudulent The Company shall not repudiate the claim and / or forfeit the policy benefits on the ground of Fraud, if the insured person / beneficiary can prove that the misstatement was true to the best of his knowledge and there was no deliberate intention to suppress the fact or that such misstatement of or suppression of material fact are within the knowledge of the insurer. 10.10. Cancellation\n\n--- END VECTOR 2 (Total chunks: 1) ---\n\n=== VECTOR 3 (Similarity: 0.785) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 3 (Total chunks: 1) ---\n\n=== VECTOR 4 (Similarity: 0.785) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 4 (Total chunks: 1) ---\n\n=== VECTOR 5 (Similarity: 0.783) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 5 (Total chunks: 1) ---\n",
+      "=== VECTOR 1 (Similarity: 0.829) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 1 (Total chunks: 1) ---\n\n=== VECTOR 2 (Similarity: 0.829) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 2 (Total chunks: 1) ---\n\n=== VECTOR 3 (Similarity: 0.824) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 3 (Total chunks: 1) ---\n\n=== VECTOR 4 (Similarity: 0.824) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 4 (Total chunks: 1) ---\n\n=== VECTOR 5 (Similarity: 0.830) ===\nDocument: unknown\nMain Chunk Index: 0\n\n--- MAIN CHUNK (Most Relevant) ---\n[Chunk 0] \n\n--- END VECTOR 5 (Total chunks: 1) ---\n"
+    ],
+    "source_vectors": [
+      [
+        {
+          "id": "unknown_1017",
+          "score": 0.8397619724273682,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 1.9073577e-05,
+          "original_similarity_score": 0.8397619724273682
+        },
+        {
+          "id": "unknown_1016",
+          "score": 0.8386958241462708,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 1.9073577e-05,
+          "original_similarity_score": 0.8386958241462708
+        },
+        {
+          "id": "unknown_973",
+          "score": 0.8289719820022583,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 1.9073577e-05,
+          "original_similarity_score": 0.8289719820022583
+        },
+        {
+          "id": "unknown_1025",
+          "score": 0.813549280166626,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 1.9073577e-05,
+          "original_similarity_score": 0.813549280166626
+        },
+        {
+          "id": "unknown_1001",
+          "score": 0.8125946521759033,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 1.9073577e-05,
+          "original_similarity_score": 0.8125946521759033
+        }
+      ],
+      [
+        {
+          "id": "input_20250810_202931.pdf_84_1993687e",
+          "score": 0.779282808303833,
+          "metadata": {
+            "chunk_id": "input_20250810_202931.pdf_84_1993687e",
+            "document_name": "input_20250810_202931.pdf",
+            "page_number": 0,
+            "content": "(10) If any maintenance/repairs required due to bad road conditions or misuse of vehicle. SUPER SPLENDOR (11) If any defect crops or repairs needed as a result of vehicle meeting to some accident. SUPER SPLENDOR (12) For consumables like oil, grease, gasket etc to be used during free services and/or warranty repairs. (13) To any part of the vehicle which has been tampered or repaired in such a manner which has resulted in SUPER SPLENDOR malfunction of the vehicle. (14) For vehicle not used in accordance with the guidelines given in this Owner's Manual. SUPER SPLENDOR (15) To proprietary items like Tyres, Tubes, Batteries etc, as they are subjected to the warranty terms & conditions of respective manufacturers and directly handled by them only. (16) Any defect(s) developing on account of external factors such as environmental factors; including but not limited to fading/peeling/rusting of paint and/or stripes and/or plated parts, seat leather tearing & cracking, aluminium parts oxidation and cracking & discoloring of control switches etc. Decision regarding warranty settlement shall be taken by Hero MotoCorp and the same shall be final and binding on all concern. Subject to DELHI JURISDICTION only. Hero MotoCorp Ltd.\n------------------ BATTERY WARRANTY PERIOD 2. 21 months from the date of charging (whichever is earlier). 1. 18 months from date of sale of vehicle or 20000 km. or",
+            "content_length": 1399,
+            "section": "content",
+            "chunk_index": 84,
+            "source_document": "input_20250810_202931.pdf",
+            "content_hash": "1993687e252bc0d595c0a4b97a180134",
+            "timestamp": 1754837988.5242581,
+            "char_count": 1399,
+            "metadata": {
+              "chunking_method": "optimized_text",
+              "content_type": "text",
+              "source_document": "input_20250810_202931.pdf",
+              "chunk_size_config": 800,
+              "overlap_config": 150
+            }
+          },
+          "text": "(10) If any maintenance/repairs required due to bad road conditions or misuse of vehicle. SUPER SPLENDOR (11) If any defect crops or repairs needed as a result of vehicle meeting to some accident. SUPER SPLENDOR (12) For consumables like oil, grease, gasket etc to be used during free services and/or warranty repairs. (13) To any part of the vehicle which has been tampered or repaired in such a manner which has resulted in SUPER SPLENDOR malfunction of the vehicle. (14) For vehicle not used in accordance with the guidelines given in this Owner's Manual. SUPER SPLENDOR (15) To proprietary items like Tyres, Tubes, Batteries etc, as they are subjected to the warranty terms & conditions of respective manufacturers and directly handled by them only. (16) Any defect(s) developing on account of external factors such as environmental factors; including but not limited to fading/peeling/rusting of paint and/or stripes and/or plated parts, seat leather tearing & cracking, aluminium parts oxidation and cracking & discoloring of control switches etc. Decision regarding warranty settlement shall be taken by Hero MotoCorp and the same shall be final and binding on all concern. Subject to DELHI JURISDICTION only. Hero MotoCorp Ltd.\n------------------ BATTERY WARRANTY PERIOD 2. 21 months from the date of charging (whichever is earlier). 1. 18 months from date of sale of vehicle or 20000 km. or",
+          "content": "(10) If any maintenance/repairs required due to bad road conditions or misuse of vehicle. SUPER SPLENDOR (11) If any defect crops or repairs needed as a result of vehicle meeting to some accident. SUPER SPLENDOR (12) For consumables like oil, grease, gasket etc to be used during free services and/or warranty repairs. (13) To any part of the vehicle which has been tampered or repaired in such a manner which has resulted in SUPER SPLENDOR malfunction of the vehicle. (14) For vehicle not used in accordance with the guidelines given in this Owner's Manual. SUPER SPLENDOR (15) To proprietary items like Tyres, Tubes, Batteries etc, as they are subjected to the warranty terms & conditions of respective manufacturers and directly handled by them only. (16) Any defect(s) developing on account of external factors such as environmental factors; including but not limited to fading/peeling/rusting of paint and/or stripes and/or plated parts, seat leather tearing & cracking, aluminium parts oxidation and cracking & discoloring of control switches etc. Decision regarding warranty settlement shall be taken by Hero MotoCorp and the same shall be final and binding on all concern. Subject to DELHI JURISDICTION only. Hero MotoCorp Ltd.\n------------------ BATTERY WARRANTY PERIOD 2. 21 months from the date of charging (whichever is earlier). 1. 18 months from date of sale of vehicle or 20000 km. or",
+          "document_name": "input_20250810_202931.pdf",
+          "page_number": 0,
+          "chunk_index": 84,
+          "rerank_score": 0.0028783479,
+          "original_similarity_score": 0.779282808303833
+        },
+        {
+          "id": "unknown_899",
+          "score": 0.791031539440155,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0010733063,
+          "original_similarity_score": 0.791031539440155
+        },
+        {
+          "id": "unknown_958",
+          "score": 0.7909480333328247,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0010733063,
+          "original_similarity_score": 0.7909480333328247
+        },
+        {
+          "id": "unknown_1032",
+          "score": 0.7848524451255798,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0010733063,
+          "original_similarity_score": 0.7848524451255798
+        },
+        {
+          "id": "unknown_979",
+          "score": 0.7825208902359009,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0010733063,
+          "original_similarity_score": 0.7825208902359009
+        }
+      ],
+      [
+        {
+          "id": "input_20250810_202931.pdf_44_170a11f0",
+          "score": 0.7924367189407349,
+          "metadata": {
+            "chunk_id": "input_20250810_202931.pdf_44_170a11f0",
+            "document_name": "input_20250810_202931.pdf",
+            "page_number": 0,
+            "content": "When descending a long steep slope use engine braking (power) by changing to lower gears, with intermittent use of both brakes. Continuous brake application can overheat the brakes and reduce their effectiveness. (1) Tool kit (2) First aid kit I mportance of maintenance The first aid kit (2) is located below the seat in the rear. For some emergency first aid can be performed by medicine contained in the kit. Kit contains the following items:  Antiseptic cream-1No.  Sterilized dressing-1No.  Water proof plaster-1No.  Elastic bandage-1No.  Gauze (Rolled bandage)-1No. A ell-maintained vehicle is essential for safe w economical and trouble-free riding. It will also help reduce pollution. To help you, take proper care of your vehicle, the following pages include a maintenance schedule and a maintenance record for regular scheduled maintenance. Sterilized elastic plaster-1No. These instructions are based on the assumption that the vehicle will be used exclusively for its designed purpose. Sustained high speed operation or operation in unusually wet or dusty conditions will require more frequent service than specified in the maintenance schedule. First aid bag-1No. CLEANING AND WASHING OF VEHICLE Follow the below mentioned steps for washing the vehicle.  Wet the vehicle with light water spray. Avoid directing water meter console, muffler outlets and electrical parts.",
+            "content_length": 1382,
+            "section": "content",
+            "chunk_index": 44,
+            "source_document": "input_20250810_202931.pdf",
+            "content_hash": "170a11f0ad2955d47881080e3771b091",
+            "timestamp": 1754837988.524072,
+            "char_count": 1382,
+            "metadata": {
+              "chunking_method": "optimized_text",
+              "content_type": "text",
+              "source_document": "input_20250810_202931.pdf",
+              "chunk_size_config": 800,
+              "overlap_config": 150
+            }
+          },
+          "text": "When descending a long steep slope use engine braking (power) by changing to lower gears, with intermittent use of both brakes. Continuous brake application can overheat the brakes and reduce their effectiveness. (1) Tool kit (2) First aid kit I mportance of maintenance The first aid kit (2) is located below the seat in the rear. For some emergency first aid can be performed by medicine contained in the kit. Kit contains the following items:  Antiseptic cream-1No.  Sterilized dressing-1No.  Water proof plaster-1No.  Elastic bandage-1No.  Gauze (Rolled bandage)-1No. A ell-maintained vehicle is essential for safe w economical and trouble-free riding. It will also help reduce pollution. To help you, take proper care of your vehicle, the following pages include a maintenance schedule and a maintenance record for regular scheduled maintenance. Sterilized elastic plaster-1No. These instructions are based on the assumption that the vehicle will be used exclusively for its designed purpose. Sustained high speed operation or operation in unusually wet or dusty conditions will require more frequent service than specified in the maintenance schedule. First aid bag-1No. CLEANING AND WASHING OF VEHICLE Follow the below mentioned steps for washing the vehicle.  Wet the vehicle with light water spray. Avoid directing water meter console, muffler outlets and electrical parts.",
+          "content": "When descending a long steep slope use engine braking (power) by changing to lower gears, with intermittent use of both brakes. Continuous brake application can overheat the brakes and reduce their effectiveness. (1) Tool kit (2) First aid kit I mportance of maintenance The first aid kit (2) is located below the seat in the rear. For some emergency first aid can be performed by medicine contained in the kit. Kit contains the following items:  Antiseptic cream-1No.  Sterilized dressing-1No.  Water proof plaster-1No.  Elastic bandage-1No.  Gauze (Rolled bandage)-1No. A ell-maintained vehicle is essential for safe w economical and trouble-free riding. It will also help reduce pollution. To help you, take proper care of your vehicle, the following pages include a maintenance schedule and a maintenance record for regular scheduled maintenance. Sterilized elastic plaster-1No. These instructions are based on the assumption that the vehicle will be used exclusively for its designed purpose. Sustained high speed operation or operation in unusually wet or dusty conditions will require more frequent service than specified in the maintenance schedule. First aid bag-1No. CLEANING AND WASHING OF VEHICLE Follow the below mentioned steps for washing the vehicle.  Wet the vehicle with light water spray. Avoid directing water meter console, muffler outlets and electrical parts.",
+          "document_name": "input_20250810_202931.pdf",
+          "page_number": 0,
+          "chunk_index": 44,
+          "rerank_score": 0.0035380858,
+          "original_similarity_score": 0.7924367189407349
+        },
+        {
+          "id": "unknown_983",
+          "score": 0.8196996450424194,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0005614787,
+          "original_similarity_score": 0.8196996450424194
+        },
+        {
+          "id": "unknown_1006",
+          "score": 0.8168293237686157,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0005614787,
+          "original_similarity_score": 0.8168293237686157
+        },
+        {
+          "id": "unknown_1027",
+          "score": 0.8166157007217407,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0005614787,
+          "original_similarity_score": 0.8166157007217407
+        },
+        {
+          "id": "unknown_1026",
+          "score": 0.8150902390480042,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0005614787,
+          "original_similarity_score": 0.8150902390480042
+        }
+      ],
+      [
+        {
+          "id": "input_20250810_202931.pdf_84_1993687e",
+          "score": 0.7845659852027893,
+          "metadata": {
+            "chunk_id": "input_20250810_202931.pdf_84_1993687e",
+            "document_name": "input_20250810_202931.pdf",
+            "page_number": 0,
+            "content": "(10) If any maintenance/repairs required due to bad road conditions or misuse of vehicle. SUPER SPLENDOR (11) If any defect crops or repairs needed as a result of vehicle meeting to some accident. SUPER SPLENDOR (12) For consumables like oil, grease, gasket etc to be used during free services and/or warranty repairs. (13) To any part of the vehicle which has been tampered or repaired in such a manner which has resulted in SUPER SPLENDOR malfunction of the vehicle. (14) For vehicle not used in accordance with the guidelines given in this Owner's Manual. SUPER SPLENDOR (15) To proprietary items like Tyres, Tubes, Batteries etc, as they are subjected to the warranty terms & conditions of respective manufacturers and directly handled by them only. (16) Any defect(s) developing on account of external factors such as environmental factors; including but not limited to fading/peeling/rusting of paint and/or stripes and/or plated parts, seat leather tearing & cracking, aluminium parts oxidation and cracking & discoloring of control switches etc. Decision regarding warranty settlement shall be taken by Hero MotoCorp and the same shall be final and binding on all concern. Subject to DELHI JURISDICTION only. Hero MotoCorp Ltd.\n------------------ BATTERY WARRANTY PERIOD 2. 21 months from the date of charging (whichever is earlier). 1. 18 months from date of sale of vehicle or 20000 km. or",
+            "content_length": 1399,
+            "section": "content",
+            "chunk_index": 84,
+            "source_document": "input_20250810_202931.pdf",
+            "content_hash": "1993687e252bc0d595c0a4b97a180134",
+            "timestamp": 1754837988.5242581,
+            "char_count": 1399,
+            "metadata": {
+              "chunking_method": "optimized_text",
+              "content_type": "text",
+              "source_document": "input_20250810_202931.pdf",
+              "chunk_size_config": 800,
+              "overlap_config": 150
+            }
+          },
+          "text": "(10) If any maintenance/repairs required due to bad road conditions or misuse of vehicle. SUPER SPLENDOR (11) If any defect crops or repairs needed as a result of vehicle meeting to some accident. SUPER SPLENDOR (12) For consumables like oil, grease, gasket etc to be used during free services and/or warranty repairs. (13) To any part of the vehicle which has been tampered or repaired in such a manner which has resulted in SUPER SPLENDOR malfunction of the vehicle. (14) For vehicle not used in accordance with the guidelines given in this Owner's Manual. SUPER SPLENDOR (15) To proprietary items like Tyres, Tubes, Batteries etc, as they are subjected to the warranty terms & conditions of respective manufacturers and directly handled by them only. (16) Any defect(s) developing on account of external factors such as environmental factors; including but not limited to fading/peeling/rusting of paint and/or stripes and/or plated parts, seat leather tearing & cracking, aluminium parts oxidation and cracking & discoloring of control switches etc. Decision regarding warranty settlement shall be taken by Hero MotoCorp and the same shall be final and binding on all concern. Subject to DELHI JURISDICTION only. Hero MotoCorp Ltd.\n------------------ BATTERY WARRANTY PERIOD 2. 21 months from the date of charging (whichever is earlier). 1. 18 months from date of sale of vehicle or 20000 km. or",
+          "content": "(10) If any maintenance/repairs required due to bad road conditions or misuse of vehicle. SUPER SPLENDOR (11) If any defect crops or repairs needed as a result of vehicle meeting to some accident. SUPER SPLENDOR (12) For consumables like oil, grease, gasket etc to be used during free services and/or warranty repairs. (13) To any part of the vehicle which has been tampered or repaired in such a manner which has resulted in SUPER SPLENDOR malfunction of the vehicle. (14) For vehicle not used in accordance with the guidelines given in this Owner's Manual. SUPER SPLENDOR (15) To proprietary items like Tyres, Tubes, Batteries etc, as they are subjected to the warranty terms & conditions of respective manufacturers and directly handled by them only. (16) Any defect(s) developing on account of external factors such as environmental factors; including but not limited to fading/peeling/rusting of paint and/or stripes and/or plated parts, seat leather tearing & cracking, aluminium parts oxidation and cracking & discoloring of control switches etc. Decision regarding warranty settlement shall be taken by Hero MotoCorp and the same shall be final and binding on all concern. Subject to DELHI JURISDICTION only. Hero MotoCorp Ltd.\n------------------ BATTERY WARRANTY PERIOD 2. 21 months from the date of charging (whichever is earlier). 1. 18 months from date of sale of vehicle or 20000 km. or",
+          "document_name": "input_20250810_202931.pdf",
+          "page_number": 0,
+          "chunk_index": 84,
+          "rerank_score": 0.0002082501,
+          "original_similarity_score": 0.7845659852027893
+        },
+        {
+          "id": "input_20250810_202842.pdf_40_c76b5496",
+          "score": 0.7844198942184448,
+          "metadata": {
+            "chunk_id": "input_20250810_202842.pdf_40_c76b5496",
+            "document_name": "input_20250810_202842.pdf",
+            "page_number": 0,
+            "content": "shall only be indemnified the treatment costs in accordance with the terms and conditions of the chosen policy. 10.9. Fraud If any claim made by the insured person, is in any respect fraudulent, or if any false statement, or declaration is made or used in support thereof, or if any fraudulent means or devices are used by the insured person or anyone acting on his/her behalf to obtain any benefit under this policy, all benefits under this policy and the premium paid shall be forfeited. Any amount already paid against claims made under this policy but which are found fraudulent later shall be repaid by all recipient(s)/policyholder(s), who has made that particular claim, who shall be jointly and severally liable for such repayment to the insurer. For the purpose of this clause, the expression \"fraud\" means any of the following acts committed by the insured person or by his agent or the hospital/doctor/any other party acting on behalf of the insured person, with intent to deceive the insurer or to induce the insurer to issue an insurance policy: a) the suggestion, as a fact of that which is not true and which the insured person does not believe to be true; b) the active concealment of a fact by the insured person having knowledge or belief of the fact; c) any other act fitted to deceive; and d) any such act or omission as the law specially declares to be fraudulent The Company shall not repudiate the claim and / or forfeit the policy benefits on the ground of Fraud, if the insured person / beneficiary can prove that the misstatement was true to the best of his knowledge and there was no deliberate intention to suppress the fact or that such misstatement of or suppression of material fact are within the knowledge of the insurer. 10.10. Cancellation",
+            "content_length": 1774,
+            "section": "content",
+            "chunk_index": 40,
+            "source_document": "input_20250810_202842.pdf",
+            "content_hash": "c76b54965454c3b35ae69df8b1eb6a33",
+            "timestamp": 1754837929.539383,
+            "char_count": 1774,
+            "metadata": {
+              "chunking_method": "optimized_text",
+              "content_type": "text",
+              "source_document": "input_20250810_202842.pdf",
+              "chunk_size_config": 800,
+              "overlap_config": 150
+            }
+          },
+          "text": "shall only be indemnified the treatment costs in accordance with the terms and conditions of the chosen policy. 10.9. Fraud If any claim made by the insured person, is in any respect fraudulent, or if any false statement, or declaration is made or used in support thereof, or if any fraudulent means or devices are used by the insured person or anyone acting on his/her behalf to obtain any benefit under this policy, all benefits under this policy and the premium paid shall be forfeited. Any amount already paid against claims made under this policy but which are found fraudulent later shall be repaid by all recipient(s)/policyholder(s), who has made that particular claim, who shall be jointly and severally liable for such repayment to the insurer. For the purpose of this clause, the expression \"fraud\" means any of the following acts committed by the insured person or by his agent or the hospital/doctor/any other party acting on behalf of the insured person, with intent to deceive the insurer or to induce the insurer to issue an insurance policy: a) the suggestion, as a fact of that which is not true and which the insured person does not believe to be true; b) the active concealment of a fact by the insured person having knowledge or belief of the fact; c) any other act fitted to deceive; and d) any such act or omission as the law specially declares to be fraudulent The Company shall not repudiate the claim and / or forfeit the policy benefits on the ground of Fraud, if the insured person / beneficiary can prove that the misstatement was true to the best of his knowledge and there was no deliberate intention to suppress the fact or that such misstatement of or suppression of material fact are within the knowledge of the insurer. 10.10. Cancellation",
+          "content": "shall only be indemnified the treatment costs in accordance with the terms and conditions of the chosen policy. 10.9. Fraud If any claim made by the insured person, is in any respect fraudulent, or if any false statement, or declaration is made or used in support thereof, or if any fraudulent means or devices are used by the insured person or anyone acting on his/her behalf to obtain any benefit under this policy, all benefits under this policy and the premium paid shall be forfeited. Any amount already paid against claims made under this policy but which are found fraudulent later shall be repaid by all recipient(s)/policyholder(s), who has made that particular claim, who shall be jointly and severally liable for such repayment to the insurer. For the purpose of this clause, the expression \"fraud\" means any of the following acts committed by the insured person or by his agent or the hospital/doctor/any other party acting on behalf of the insured person, with intent to deceive the insurer or to induce the insurer to issue an insurance policy: a) the suggestion, as a fact of that which is not true and which the insured person does not believe to be true; b) the active concealment of a fact by the insured person having knowledge or belief of the fact; c) any other act fitted to deceive; and d) any such act or omission as the law specially declares to be fraudulent The Company shall not repudiate the claim and / or forfeit the policy benefits on the ground of Fraud, if the insured person / beneficiary can prove that the misstatement was true to the best of his knowledge and there was no deliberate intention to suppress the fact or that such misstatement of or suppression of material fact are within the knowledge of the insurer. 10.10. Cancellation",
+          "document_name": "input_20250810_202842.pdf",
+          "page_number": 0,
+          "chunk_index": 40,
+          "rerank_score": 4.4694072e-05,
+          "original_similarity_score": 0.7844198942184448
+        },
+        {
+          "id": "unknown_639",
+          "score": 0.7845478653907776,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 1.9679026e-05,
+          "original_similarity_score": 0.7845478653907776
+        },
+        {
+          "id": "unknown_561",
+          "score": 0.7845121622085571,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 1.9679026e-05,
+          "original_similarity_score": 0.7845121622085571
+        },
+        {
+          "id": "unknown_1018",
+          "score": 0.7833597660064697,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 1.9679026e-05,
+          "original_similarity_score": 0.7833597660064697
+        }
+      ],
+      [
+        {
+          "id": "unknown_899",
+          "score": 0.828985333442688,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.003311519,
+          "original_similarity_score": 0.828985333442688
+        },
+        {
+          "id": "unknown_958",
+          "score": 0.8289620876312256,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.003311519,
+          "original_similarity_score": 0.8289620876312256
+        },
+        {
+          "id": "unknown_850",
+          "score": 0.8243908882141113,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.003311519,
+          "original_similarity_score": 0.8243908882141113
+        },
+        {
+          "id": "unknown_849",
+          "score": 0.8243908882141113,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.003311519,
+          "original_similarity_score": 0.8243908882141113
+        },
+        {
+          "id": "unknown_561",
+          "score": 0.8304445743560791,
+          "metadata": {},
+          "text": "",
+          "content": "",
+          "document_name": "unknown",
+          "page_number": 0,
+          "chunk_index": 0,
+          "rerank_score": 0.0032858334,
+          "original_similarity_score": 0.8304445743560791
+        }
+      ]
+    ],
+    "total_time_taken": 25.308419227600098,
+    "timing_breakdown": {
+      "pdf_download": 1.3766050338745117,
+      "pdf_processing": 14.95940089225769,
+      "embedding_time": 0.501702070236206,
+      "query_processing_time": 8.469345092773438,
+      "cleanup_time": 9.5367431640625e-07
+    },
+    "multithreading_performance": {
+      "embedding_workers": 5,
+      "query_workers": 5,
+      "individual_embedding_times": [
+        0.5008468627929688,
+        0.4892849922180176,
+        0.4964179992675781,
+        0.47557687759399414,
+        0.48357725143432617
+      ],
+      "individual_query_times": [
+        3.956684112548828,
+        3.538099765777588,
+        4.539431810379028,
+        8.468353986740112,
+        5.778165817260742
+      ],
+      "bottleneck_analysis": {
+        "slowest_query_time": 8.468353986740112,
+        "fastest_query_time": 3.538099765777588,
+        "time_variance": 4.930254220962524,
+        "parallel_efficiency": 0.6206084462216713
+      },
+      "embedding_speedup": 4.874813416965619,
+      "query_speedup": 3.1030422311083568
+    },
+    "vector_info": {
+      "total_queries": 5,
+      "query_embedding_dimension": 1024,
+      "embedding_model": "multilingual-e5-large",
+      "total_similarity_results": 25,
+      "context_info": {
+        "total_contexts_provided": 5,
+        "average_context_length": 2020.8,
+        "total_source_vectors": 25
+      }
+    }
+  },
+  "processing_summary": {
+    "success": true,
+    "total_questions": 5,
+    "total_time_seconds": 25.308419227600098,
+    "pdf_processing_time": 14.95940089225769,
+    "embedding_time": 0.501702070236206,
+    "query_processing_time": 8.469345092773438
+  }
+}

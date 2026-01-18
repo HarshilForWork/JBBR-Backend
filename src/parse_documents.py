@@ -91,6 +91,62 @@ def _is_valid_table(cleaned_data: List[List[str]]) -> bool:
     
     return True
 
+def _is_headerless(table_data: List[List[str]]) -> bool:
+    """
+    Check if a table is likely headerless based on the first row's content.
+    A row is considered a data row if it contains numbers or long text.
+    """
+    if not table_data:
+        return True
+    
+    first_row = table_data[0]
+    # Simple heuristic: if any cell in the first row contains only numbers, it's likely not a header.
+    for cell in first_row:
+        cell_text = cell.strip()
+        if cell_text.isdigit():
+            return True
+    
+    # Another heuristic: if the first row is very similar to the second row
+    if len(table_data) > 1:
+        second_row = table_data[1]
+        if len(first_row) == len(second_row):
+            # Check for structural similarity (e.g., both have numbers in the same places)
+            first_row_types = ['d' if c.isdigit() else 's' for c in first_row]
+            second_row_types = ['d' if c.isdigit() else 's' for c in second_row]
+            if first_row_types == second_row_types:
+                return True
+
+    return False
+
+def _find_contextual_header(table_bbox: List[float], text_blocks: List[Dict], page_height: float) -> str:
+    """
+    Find the most likely header text for a table from nearby text blocks.
+    Prioritizes text that is close, directly above, and centrally aligned.
+    """
+    best_candidate = ""
+    min_distance = float('inf')
+
+    table_y_top = table_bbox[1]
+
+    for block in text_blocks:
+        block_bbox = block.get('bbox', [0,0,0,0])
+        block_y_bottom = block_bbox[3]
+        
+        # Rule 1: Text must be above the table
+        if block_y_bottom <= table_y_top:
+            vertical_distance = table_y_top - block_y_bottom
+            
+            # Rule 2: Text must be reasonably close vertically (e.g., within 10% of page height)
+            if vertical_distance < page_height * 0.1:
+
+                    # This is a good candidate, check if it's the best one so far
+                if vertical_distance < min_distance:
+                    min_distance = vertical_distance
+                    best_candidate = block.get('content', '')
+
+    return best_candidate.strip()
+
+
 def extract_tables_with_pdfplumber(pdf_path: str) -> Dict[int, List[Dict]]:
     """
     Extract tables using pdfplumber for superior table detection.
@@ -119,6 +175,10 @@ def extract_tables_with_pdfplumber(pdf_path: str) -> Dict[int, List[Dict]]:
                     "min_words_horizontal": 2  # Increased from 1 to 2
                 })
                 
+                # We need all text blocks on the page to find contextual headers
+                # This is done once per page for efficiency
+                all_page_text_blocks = [{'content': w['text'], 'bbox': (w['x0'], w['top'], w['x1'], w['bottom'])} for w in page.extract_words(keep_blank_chars=False, use_text_flow=True)]
+
                 for table in detected_tables:
                     try:
                         # Extract table data
@@ -155,11 +215,34 @@ def extract_tables_with_pdfplumber(pdf_path: str) -> Dict[int, List[Dict]]:
                                 # Get table bbox for positioning
                                 bbox = table.bbox if hasattr(table, 'bbox') else [0, 0, 0, 0]
                                 
-                                # Create markdown table
-                                table_markdown = _create_clean_markdown_table(normalized_data)
+                                # Check if table is headerless
+                                is_headerless = _is_headerless(normalized_data)
+                                table_data_for_markdown = list(normalized_data) # Make a copy
+
+                                if is_headerless:
+                                    # Find header from nearby text using all text blocks from the page
+                                    summary = _find_contextual_header(bbox, all_page_text_blocks, page.height)
+                                    if not summary:
+                                        summary = f"This is a table with {max_cols} columns and {len(table_data_for_markdown)} rows."
+                                    
+                                    # Add generic headers for markdown creation
+                                    generic_headers = [f"Column {i+1}" for i in range(max_cols)]
+                                    table_data_for_markdown.insert(0, generic_headers)
+                                else:
+                                    # Generate a descriptive summary for the table with real headers
+                                    rows = len(normalized_data) - 1 # Exclude header
+                                    cols = len(normalized_data[0]) if normalized_data else 0
+                                    col_names = ", ".join(f"'{c}'" for c in normalized_data[0]) if normalized_data else ""
+                                    summary = f"This is a table with {cols} columns and {rows} rows. The columns are: {col_names}."
+
+                                # Create markdown table using the potentially modified data
+                                table_markdown = _create_clean_markdown_table(table_data_for_markdown)
                                 
+                                # Create the final hybrid content with summary + markdown table
+                                hybrid_content = f"{summary}\n\n{table_markdown}"
+
                                 tables.append({
-                                    'content': table_markdown,
+                                    'content': hybrid_content,
                                     'type': 'table',
                                     'bbox': bbox,
                                     'y_position': bbox[1] if bbox else 0,

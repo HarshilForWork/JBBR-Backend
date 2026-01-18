@@ -19,6 +19,7 @@ class OptimizedChunkConfig:
     max_chunk_size: int = 1500     # Maximum chunk size
     split_on_sentences: bool = True # Try to split on sentence boundaries
     preserve_paragraphs: bool = True # Try to keep paragraphs intact
+    separate_tables: bool = True    # Create separate chunks for tables
 
 
 class OptimizedTextChunker:
@@ -36,6 +37,43 @@ class OptimizedTextChunker:
     def __init__(self, config: Optional[OptimizedChunkConfig] = None):
         self.config = config or OptimizedChunkConfig()
         print(f"✅ OptimizedTextChunker initialized (CPU-only, {self.config.chunk_size} chars/chunk)")
+        if self.config.separate_tables:
+            print(f"📊 Table separation enabled - tables will get dedicated chunks")
+    
+    def _extract_tables_and_text(self, content: str) -> tuple:
+        """
+        Extract tables and remaining text separately.
+        Returns: (tables_list, text_without_tables)
+        """
+        tables = []
+        remaining_text = content
+        
+        # Find all table sections
+        table_pattern = r'TABLE:\n(.*?)(?=\n\n|\n(?=[A-Z][A-Za-z\s]*:)|$)'
+        table_matches = re.finditer(table_pattern, content, re.DOTALL)
+        
+        # Extract tables from end to beginning to preserve indices
+        table_positions = []
+        for match in table_matches:
+            table_content = match.group(1).strip()
+            if table_content:  # Only if table has content
+                tables.append({
+                    'content': f"TABLE:\n{table_content}",
+                    'start': match.start(),
+                    'end': match.end(),
+                    'type': 'table'
+                })
+                table_positions.append((match.start(), match.end()))
+        
+        # Remove tables from text (process from end to beginning)
+        table_positions.sort(reverse=True)
+        for start, end in table_positions:
+            remaining_text = remaining_text[:start] + remaining_text[end:]
+        
+        # Clean up remaining text
+        remaining_text = re.sub(r'\n{3,}', '\n\n', remaining_text).strip()
+        
+        return tables, remaining_text
     
     def _split_into_sentences(self, text: str) -> List[str]:
         """Split text into sentences using regex patterns."""
@@ -165,7 +203,7 @@ class OptimizedTextChunker:
     
     def chunk_text(self, text: str, document_name: str = "unknown") -> List[Dict[str, Any]]:
         """
-        Chunk a single text document into optimized chunks.
+        Chunk a single text document into optimized chunks with separate table handling.
         
         Args:
             text: Input text to chunk
@@ -182,51 +220,93 @@ class OptimizedTextChunker:
         
         print(f"📄 Chunking {document_name}: {len(text):,} characters")
         
-        # Try different chunking strategies based on text characteristics
-        chunks = []
-        
-        if self.config.preserve_paragraphs and '\n\n' in text:
-            # Strategy 1: Paragraph-aware chunking
-            paragraphs = self._split_into_paragraphs(text)
-            
-            if paragraphs:
-                print(f"📝 Using paragraph-based chunking ({len(paragraphs)} paragraphs)")
-                chunks = self._create_overlapping_chunks(paragraphs, "paragraph")
-        
-        # If paragraph chunking didn't work well, try sentence-based
-        if not chunks and self.config.split_on_sentences:
-            sentences = self._split_into_sentences(text)
-            
-            if len(sentences) > 5:  # Only if we have enough sentences
-                print(f"📝 Using sentence-based chunking ({len(sentences)} sentences)")
-                chunks = self._create_overlapping_chunks(sentences, "sentence")
-        
-        # Fallback to simple character-based chunking
-        if not chunks:
-            print(f"📝 Using character-based chunking (fallback)")
-            chunks = self._simple_chunk_by_size(text)
-        
-        # Convert to structured format
         structured_chunks = []
-        for i, chunk_text in enumerate(chunks):
-            chunk_id = f"{document_name}_{i}_{hashlib.md5(chunk_text.encode()).hexdigest()[:8]}"
+        chunk_index = 0
+        
+        # Handle tables separately if enabled
+        if self.config.separate_tables and "TABLE:" in text:
+            tables, remaining_text = self._extract_tables_and_text(text)
             
-            structured_chunks.append({
-                'chunk_id': chunk_id,
-                'document_name': document_name,
-                'content': chunk_text,
-                'chunk_index': i,
-                'char_count': len(chunk_text),
-                'metadata': {
-                    'chunking_method': 'optimized_text',
-                    'source_document': document_name,
-                    'chunk_size_config': self.config.chunk_size,
-                    'overlap_config': self.config.chunk_overlap
-                }
-            })
+            print(f"📊 Found {len(tables)} tables to chunk separately")
+            
+            # Create separate chunks for each table
+            for table in tables:
+                table_content = table['content']
+                chunk_id = f"{document_name}_table_{chunk_index}_{hashlib.md5(table_content.encode()).hexdigest()[:8]}"
+                
+                structured_chunks.append({
+                    'chunk_id': chunk_id,
+                    'document_name': document_name,
+                    'content': table_content,
+                    'chunk_index': chunk_index,
+                    'char_count': len(table_content),
+                    'metadata': {
+                        'chunking_method': 'table_dedicated',
+                        'content_type': 'table',
+                        'source_document': document_name,
+                        'chunk_size_config': self.config.chunk_size,
+                        'overlap_config': self.config.chunk_overlap
+                    }
+                })
+                chunk_index += 1
+            
+            # Use remaining text for regular chunking
+            text = remaining_text
+            print(f"📝 Processing remaining text: {len(text):,} characters")
+        
+        # Process regular text content
+        if text and text.strip():
+            # Try different chunking strategies based on text characteristics
+            chunks = []
+            
+            if self.config.preserve_paragraphs and '\n\n' in text:
+                # Strategy 1: Paragraph-aware chunking
+                paragraphs = self._split_into_paragraphs(text)
+                
+                if paragraphs:
+                    print(f"📝 Using paragraph-based chunking ({len(paragraphs)} paragraphs)")
+                    chunks = self._create_overlapping_chunks(paragraphs, "paragraph")
+            
+            # If paragraph chunking didn't work well, try sentence-based
+            if not chunks and self.config.split_on_sentences:
+                sentences = self._split_into_sentences(text)
+                
+                if len(sentences) > 5:  # Only if we have enough sentences
+                    print(f"📝 Using sentence-based chunking ({len(sentences)} sentences)")
+                    chunks = self._create_overlapping_chunks(sentences, "sentence")
+            
+            # Fallback to simple character-based chunking
+            if not chunks:
+                print(f"📝 Using character-based chunking (fallback)")
+                chunks = self._simple_chunk_by_size(text)
+            
+            # Convert text chunks to structured format
+            for chunk_text in chunks:
+                chunk_id = f"{document_name}_{chunk_index}_{hashlib.md5(chunk_text.encode()).hexdigest()[:8]}"
+                
+                structured_chunks.append({
+                    'chunk_id': chunk_id,
+                    'document_name': document_name,
+                    'content': chunk_text,
+                    'chunk_index': chunk_index,
+                    'char_count': len(chunk_text),
+                    'metadata': {
+                        'chunking_method': 'optimized_text',
+                        'content_type': 'text',
+                        'source_document': document_name,
+                        'chunk_size_config': self.config.chunk_size,
+                        'overlap_config': self.config.chunk_overlap
+                    }
+                })
+                chunk_index += 1
         
         processing_time = time.time() - start_time
+        table_count = sum(1 for chunk in structured_chunks if chunk['metadata'].get('content_type') == 'table')
+        text_count = len(structured_chunks) - table_count
+        
         print(f"✅ Created {len(structured_chunks)} chunks in {processing_time:.2f}s")
+        print(f"📊 Tables: {table_count} dedicated chunks")
+        print(f"📝 Text: {text_count} regular chunks")
         
         return structured_chunks
 
@@ -255,14 +335,15 @@ def chunk_documents_optimized(parsed_content: List[Dict[str, Any]],
     print(f"🚀 Starting Optimized Text Chunking...")
     start_time = time.time()
     
-    # Create optimized chunker
+    # Create optimized chunker with table separation enabled
     config = OptimizedChunkConfig(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         min_chunk_size=max(50, chunk_size // 8),  # More reasonable minimum
         max_chunk_size=chunk_size * 2,
         split_on_sentences=True,
-        preserve_paragraphs=True
+        preserve_paragraphs=True,
+        separate_tables=True  # Enable table separation
     )
     
     chunker = OptimizedTextChunker(config)
@@ -284,8 +365,14 @@ def chunk_documents_optimized(parsed_content: List[Dict[str, Any]],
     total_chars = sum(len(doc.get('content', '')) for doc in parsed_content)
     avg_chunk_size = sum(len(chunk['content']) for chunk in all_chunks) / len(all_chunks) if all_chunks else 0
     
+    # Count table vs text chunks
+    table_chunks = sum(1 for chunk in all_chunks if chunk['metadata'].get('content_type') == 'table')
+    text_chunks = len(all_chunks) - table_chunks
+    
     print(f"✅ Optimized Text Chunking complete!")
     print(f"📊 Generated {len(all_chunks)} total chunks")
+    print(f"📊 Table chunks: {table_chunks} (dedicated)")
+    print(f"📝 Text chunks: {text_chunks} (regular)")
     if total_time > 0:
         print(f"⚡ Processing speed: {total_chars / total_time:.0f} chars/sec")
     else:

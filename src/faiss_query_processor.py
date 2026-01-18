@@ -222,9 +222,9 @@ class FAISSQueryProcessor:
                     text = chunk['metadata'].get('text', '')
                 
                 if text:
-                    # Clean and truncate text
+                    # Clean text but preserve full content
                     clean_text = re.sub(r'\s+', ' ', text).strip()
-                    documents.append(clean_text[:1000])  # Limit to 1000 chars
+                    documents.append(clean_text)  # No character limit - preserve full content
                 else:
                     documents.append("")
             

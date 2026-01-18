@@ -11,6 +11,7 @@ import pickle
 import numpy as np
 import faiss
 from typing import Dict, List, Any, Optional, Tuple
+from rake_nltk import Rake
 
 # Suppress specific tokenizer warnings for BGE Reranker
 warnings.filterwarnings(
@@ -312,6 +313,34 @@ class QueryProcessor:
         print(f"🔍 Full response for debugging: '{response_text}'")
         return None
     
+    def _extract_keywords_with_rake(self, query: str, max_words: int = 5) -> List[str]:
+        """
+        Extract keywords and phrases from a query using RAKE-NLTK and a
+        heuristic for consecutive capitalized words.
+        """
+        # 1. Extract keywords using RAKE
+        r = Rake()
+        r.extract_keywords_from_text(query)
+        ranked_phrases = r.get_ranked_phrases_with_scores()
+        rake_keywords = [phrase for score, phrase in ranked_phrases if score > 1]
+        if not rake_keywords:
+            rake_keywords = [phrase for score, phrase in ranked_phrases]
+
+        # 2. Extract consecutive capitalized words and acronyms
+        # This pattern finds consecutive capitalized words
+        capitalized_phrases = re.findall(r'\b[A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)+\b', query)
+        # This pattern finds acronyms like "TPA" or "OPD"
+        acronyms = re.findall(r'\b[A-Z]{2,}\b', query)
+
+        # 3. Combine and deduplicate
+        combined_keywords = capitalized_phrases + acronyms + rake_keywords
+        
+        # Deduplicate while preserving order
+        unique_keywords = list(dict.fromkeys(combined_keywords))
+        
+        # Limit to max_words
+        return unique_keywords[:max_words]
+
     def _make_llm_request_with_retry(self, prompt: str, max_retries: int = 2) -> Optional[str]:
         """Make LLM request with retry logic and quota detection."""
         if not self.llm:
@@ -425,48 +454,8 @@ class QueryProcessor:
     
     def _extract_keywords(self, query: str) -> List[str]:
         """Extract important keywords from the query for hybrid search."""
-        # Remove stop words and special characters
-        import re
-        import string
-        
-        # Common stop words
-        stop_words = {
-            "a", "an", "the", "in", "on", "at", "by", "for", "with", "about", 
-            "against", "between", "into", "through", "during", "before", "after",
-            "above", "below", "to", "from", "up", "down", "is", "am", "are", "was",
-            "were", "be", "been", "being", "have", "has", "had", "having", "do",
-            "does", "did", "doing", "would", "should", "could", "ought", "i'm",
-            "you're", "he's", "she's", "it's", "we're", "they're", "i've", "you've",
-            "we've", "they've", "i'd", "you'd", "he'd", "she'd", "we'd", "they'd",
-            "i'll", "you'll", "he'll", "she'll", "we'll", "they'll", "isn't", "aren't",
-            "wasn't", "weren't", "hasn't", "haven't", "hadn't", "doesn't", "don't",
-            "didn't", "won't", "wouldn't", "shan't", "shouldn't", "can't", "cannot",
-            "couldn't", "mustn't", "let's", "that's", "who's", "what's", "here's",
-            "there's", "when's", "where's", "why's", "how's", "of", "this", "that",
-            "these", "those", "is", "are", "will", "be"
-        }
-        
-        # Clean the query
-        query = query.lower()
-        # Remove punctuation
-        query = re.sub(f'[{string.punctuation}]', ' ', query)
-        # Split into words
-        words = query.split()
-        # Filter out stop words and single-character words
-        keywords = [word for word in words if word not in stop_words and len(word) > 2]
-        
-        # Add any numbers as they are likely important
-        numbers = re.findall(r'\d+', query)
-        keywords.extend(numbers)
-        
-        # Deduplicate
-        keywords = list(set(keywords))
-        
-        # Take the most important keywords (limit to avoid too restrictive filtering)
-        if len(keywords) > 5:
-            keywords = keywords[:5]
-            
-        return keywords
+        # Use the new RAKE-based keyword extraction
+        return self._extract_keywords_with_rake(query)
         
     def _calculate_hybrid_score(self, candidate: Dict, keywords: List[str]) -> float:
         """Calculate a hybrid score based on vector similarity and keyword presence."""

@@ -436,7 +436,8 @@ async def enhanced_query_pdf(input: QueryPDFRequest, token: str = Depends(verify
     print(f"   📊 Embedding Speedup: {multithreading_stats.get('embedding_speedup', 1.0):.2f}x")
     print(f"   📊 Query Speedup: {multithreading_stats.get('query_speedup', 1.0):.2f}x")
 
-    return JSONResponse(response_data)
+    # Return only the list of answers as the final response to the client
+    return JSONResponse(content={"answers": answers})
 
 @app.get("/health")
 async def health_check():
