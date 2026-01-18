@@ -1,0 +1,13 @@
+PARSE DOCUMENTS TEST OUTPUT
+============================================================
+Test Date: 2025-08-10 18:53:39
+Source File: docs\policy.pdf
+Parsing Time: 3.19 seconds
+
+METADATA
+--------------------
+Total Pages: 25
+Parsing Method: hybrid_pymupdf_pdfplumber
+Tables Found: 8
+Text Blocks: 560
+Characters Extracted: 113,108

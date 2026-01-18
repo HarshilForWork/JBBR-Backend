@@ -264,7 +264,7 @@ def extract_tables_with_pdfplumber(pdf_path: str) -> Dict[int, List[Dict]]:
     return page_tables
 
 def _create_clean_markdown_table(data: List[List[str]]) -> str:
-    """Create a clean, well-formatted markdown table."""
+    """Create a clean, well-formatted markdown table without truncating content."""
     if not data or len(data) < 2:
         return ""
     
@@ -280,36 +280,25 @@ def _create_clean_markdown_table(data: List[List[str]]) -> str:
             header_str = f"Col_{i+1}"
         clean_headers.append(header_str)
     
-    # Calculate optimal column widths for readability
-    all_rows = [clean_headers] + rows
-    col_widths = []
-    for i in range(len(clean_headers)):
-        max_width = max(len(str(row[i]) if i < len(row) else "") for row in all_rows)
-        # Set reasonable width bounds
-        col_widths.append(min(max(max_width, 8), 50))
-    
-    # Create formatted table
+    # Create formatted table WITHOUT width restrictions
     table_lines = []
     
     # Header row
-    header_cells = []
-    for i, header in enumerate(clean_headers):
-        header_cells.append(str(header).ljust(col_widths[i]))
+    header_cells = [str(header).strip() for header in clean_headers]
     table_lines.append("| " + " | ".join(header_cells) + " |")
     
-    # Separator row
-    separator_cells = ["-" * width for width in col_widths]
+    # Separator row  
+    separator_cells = ["-" * max(3, len(str(header))) for header in clean_headers]
     table_lines.append("| " + " | ".join(separator_cells) + " |")
     
-    # Data rows
+    # Data rows - NO TRUNCATION, preserve all content
     for row in rows:
         data_cells = []
-        for i, cell in enumerate(row):
+        for cell in row:
             cell_str = str(cell).strip() if cell else ""
-            # Handle long content gracefully
-            if len(cell_str) > col_widths[i] - 3:
-                cell_str = cell_str[:col_widths[i] - 3] + "..."
-            data_cells.append(cell_str.ljust(col_widths[i]))
+            # Clean whitespace only, preserve all content
+            cell_str = re.sub(r'\s+', ' ', cell_str)
+            data_cells.append(cell_str)
         table_lines.append("| " + " | ".join(data_cells) + " |")
     
     return "\n".join(table_lines)
@@ -704,7 +693,7 @@ def detect_table_structures(page, min_rows=2, min_cols=2) -> List[Dict]:
                                 
                                 if len(normalized_data) >= min_rows and max_cols >= min_cols:
                                     # Create markdown table
-                                    table_markdown = _create_markdown_table(normalized_data)
+                                    table_markdown = _create_clean_markdown_table(normalized_data)
                                     
                                     tables.append({
                                         'content': table_markdown,
