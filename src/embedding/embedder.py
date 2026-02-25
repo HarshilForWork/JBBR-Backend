@@ -11,9 +11,9 @@ import numpy as np
 import faiss
 from pinecone import Pinecone, ServerlessSpec
 try:
-    from .document_registry import DocumentRegistry
+    from ..indexing.registry import DocumentRegistry
 except ImportError:
-    from document_registry import DocumentRegistry
+    from src.indexing.registry import DocumentRegistry
 
 def generate_embeddings_batch(texts: List[str], api_key: str, batch_size: int = 96) -> List[List[float]]:
     """
@@ -337,7 +337,7 @@ def index_chunks_in_pinecone(chunks: List[Dict], pinecone_api_key: str, pinecone
         progress_callback("Initializing enhanced FAISS storage...", 0)
     
     try:
-        from .faiss_storage import FAISSVectorStore, check_or_create_faiss_index
+        from ..indexing.store import FAISSVectorStore, check_or_create_faiss_index
         
         # Check/create FAISS index
         if not check_or_create_faiss_index(index_name, 1024):
@@ -421,14 +421,14 @@ def smart_index_documents(docs_folder: str, pinecone_api_key: str, index_name: s
         }
     start_time = time.time()
     processed_files = []
-    from .chunk_documents_optimized import chunk_documents_optimized
+    from ..feature_engineering.chunker import chunk_documents_optimized
     total_files = len(files_to_process)
     for i, filename in enumerate(files_to_process):
         file_path = os.path.join(docs_folder, filename)
         if progress_callback:
             progress_callback(f"🔄 Processing {filename} ({i+1}/{total_files})...", 20 + (i / total_files) * 60)
         try:
-            from .parse_documents import load_and_parse_from_folder
+            from ..data_processing.parser import load_and_parse_from_folder
             parsed_docs = load_and_parse_from_folder(docs_folder, file_filter=[filename], save_parsed_text=save_parsed_text)
             if parsed_docs:
                 transformed_docs = []

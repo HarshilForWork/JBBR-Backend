@@ -1,0 +1,81 @@
+# ============================================================
+# config.yaml — HackRx Insurance API Configuration
+# All tuneable parameters in one place.
+# ============================================================
+
+# ── LLM ─────────────────────────────────────────────────────
+llm:
+  # ── Provider switch ───────────────────────────────────────
+  # Set to "groq" or "gemini". Requires the matching API key in .env.
+  provider: groq
+
+  # ── Groq settings (used when provider: groq) ──────────────
+  model: llama-3.3-70b-versatile
+  # Other Groq models:
+  #   llama-3.1-8b-instant   (fastest, lower accuracy)
+  #   mixtral-8x7b-32768     (good balance)
+  #   gemma2-9b-it           (Google via Groq)
+
+  # ── Gemini settings (used when provider: gemini) ──────────
+  gemini_model: gemini-3-flash-preview
+  # Other Gemini models:
+  #   gemini-1.5-flash       (fast, large context)
+  #   gemini-1.5-pro         (best quality, slower)
+  #   gemini-2.0-flash-lite  (lightest / cheapest)
+
+  # ── Shared settings ───────────────────────────────────────
+  temperature: 0.2     # Lower = more deterministic JSON; range 0.0–1.0
+  max_tokens: ~        # Max tokens in LLM response (null/~ = no cap, or set e.g. 4096)
+  max_retries: 2       # Number of retries on LLM failure
+
+# ── Embedding (Pinecone Inference) ──────────────────────────
+embedding:
+  model: multilingual-e5-large # Pinecone embedding model
+  input_type: query # "query" for retrieval queries
+  truncate: END # Truncation strategy: END | START | NONE
+  dimension: 1024 # Embedding vector dimension (fixed for model)
+  use_batch_api: true # true = single batched call; false = one-per-query
+  fallback_to_individual: true # Fall back to individual embedding if batch fails
+
+# ── Retrieval & Reranking ────────────────────────────────────
+retrieval:
+  index_name: policy-index # FAISS / Pinecone index name
+  search_top_k: 20 # Number of candidates retrieved from FAISS
+  rerank_top_k: 5 # Number of final results after reranking
+  reranker_model: bge-reranker-v2-m3 # Pinecone reranker model
+  adjacent_chunks_before: 2 # Context chunks to prepend around each result
+  adjacent_chunks_after: 2 # Context chunks to append around each result
+
+# ── Chunking ─────────────────────────────────────────────────
+chunking:
+  chunk_size: 800 # Characters per chunk
+  chunk_overlap: 150 # Overlap between adjacent chunks
+  use_semantic: true # Use semantic chunking strategy
+
+# ── Concurrency ──────────────────────────────────────────────
+concurrency:
+  max_concurrent_queries: 20 # asyncio.gather concurrency cap (per request)
+  http_download_timeout: 30 # Seconds before PDF download times out
+
+# ── Logging ──────────────────────────────────────────────────
+logging:
+  enabled: true # Save per-request JSON logs
+  log_dir: request_logs # Directory for log files
+  log_prefix: async_log # Filename prefix for log files
+
+# ── Storage ──────────────────────────────────────────────────
+storage:
+  pdf_storage_dir: stored_pdfs # Directory where downloaded PDFs are saved
+  faiss_storage_dir: faiss_storage # Directory for FAISS index files
+
+# ── Executor (ThreadPoolExecutor) ────────────────────────────
+executor:
+  max_workers: 10   # Max concurrent blocking pipeline workers
+                    # Each request consumes one worker for its full duration.
+                    # Set to CPU count * 2 for I/O-heavy workloads.
+
+# ── Server ───────────────────────────────────────────────────
+server:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true # Hot-reload (dev only, disable in prod)

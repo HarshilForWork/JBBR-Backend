@@ -175,3 +175,15 @@ Thumbs.db
 .streamlit
 tests
 results
+
+# logs
+request_logs/
+
+# faiss
+faiss_storage/
+
+# stored_pdfs
+stored_pdfs/
+
+# agent
+.agent/

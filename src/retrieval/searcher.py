@@ -29,27 +29,68 @@ except ImportError:
     PINECONE_AVAILABLE = False
 
 try:
-    import google.generativeai as genai
-    GENAI_AVAILABLE = True
+    from groq import Groq as GroqClient
+    GROQ_AVAILABLE = True
 except ImportError:
-    GENAI_AVAILABLE = False
+    GROQ_AVAILABLE = False
+
+# ── Load config.yaml (optional; falls back to defaults if not found) ─────────
+import os as _os
+import yaml as _yaml
+
+def _load_cfg() -> dict:
+    cfg_path = _os.path.join(_os.path.dirname(__file__), "..", "..", "config.yaml")
+    try:
+        with open(cfg_path, "r") as _f:
+            return _yaml.safe_load(_f) or {}
+    except Exception:
+        return {}
+
+_CFG = _load_cfg()
+_LLM_CFG = _CFG.get("llm", {})
+_RET_CFG = _CFG.get("retrieval", {})
 
 # FAISS storage and embeddings integration
-from .faiss_storage import FAISSVectorStore, check_or_create_faiss_index
-from .embed_and_index import generate_query_embedding_pinecone
+from ..indexing.store import FAISSVectorStore, check_or_create_faiss_index
+from ..embedding.embedder import generate_query_embedding_pinecone
+
+# Inference stage — Groq LLM evaluation
+from ..inference import GroqEvaluator, LLMAnswer
 
 
 class FAISSQueryProcessor:
     """Query processor using FAISS for vector storage instead of Pinecone."""
-    
-    def __init__(self, pinecone_api_key: str, gemini_api_key: str, index_name: str = 'policy-index'):
+
+    def __init__(self, pinecone_api_key: str, gemini_api_key: str = "unused",
+                 index_name: str = "policy-index",
+                 groq_api_key: Optional[str] = None):
+        """
+        Parameters
+        ----------
+        pinecone_api_key : Pinecone key for embeddings & BGE reranker.
+        gemini_api_key   : Kept for backward-compat; ignored (Groq is used).
+        index_name       : FAISS index name (must match config.yaml retrieval.index_name).
+        groq_api_key     : Groq key. Falls back to GROQ_API_KEY env var if None.
+        """
+        import os
         self.pinecone_api_key = pinecone_api_key
-        self.gemini_api_key = gemini_api_key
         self.index_name = index_name
         self.quota_exceeded = False
         self.fallback_reason = None
-        
-        # Initialize FAISS vector store
+
+        # ── Resolve Groq key ──────────────────────────────────────────────
+        self._groq_key = groq_api_key or os.getenv("GROQ_API_KEY", "")
+        self.model_name = _LLM_CFG.get("model", "llama-3.3-70b-versatile")
+        self._temperature = float(_LLM_CFG.get("temperature", 0.2))
+        # max_tokens: None / null in config.yaml means no cap — do NOT cast None to int
+        _cfg_max = _LLM_CFG.get("max_tokens", None)
+        self._max_tokens = int(_cfg_max) if _cfg_max is not None else None
+        self._max_retries = int(_LLM_CFG.get("max_retries", 2))
+        # Adjacent chunk window — how many chunks around each top result to include in context
+        self._adj_before = int(_RET_CFG.get("adjacent_chunks_before", 5))
+        self._adj_after  = int(_RET_CFG.get("adjacent_chunks_after",  5))
+
+        # ── Initialize FAISS vector store ─────────────────────────────────
         try:
             print("🔍 Checking/creating FAISS index with correct dimensions...")
             if check_or_create_faiss_index(index_name, 1024):
@@ -61,27 +102,22 @@ class FAISSQueryProcessor:
         except Exception as e:
             print(f"FAISS initialization error: {e}")
             self.vector_store = None
-        
-        # Use Pinecone embeddings - no fallbacks
+
         print("✅ Using Pinecone multilingual-e5-large embeddings")
-        
-        # Initialize BGE Reranker with Pinecone
+
+        # ── Initialize BGE Reranker via Pinecone ──────────────────────────
         self.reranker_available = False
         try:
-            # Check if BGE reranker is available in Pinecone
-            if PINECONE_AVAILABLE and pinecone_api_key and pinecone_api_key != 'dummy':
+            if PINECONE_AVAILABLE and pinecone_api_key and pinecone_api_key != "dummy":
                 self.pc = Pinecone(api_key=pinecone_api_key)
-                if hasattr(self.pc, 'inference'):
-                    print("🔍 Checking BGE Reranker-v2-m3 availability...")
+                if hasattr(self.pc, "inference"):
                     self.reranker_available = True
-                    self.reranker_type = "bge-reranker-v2-m3"
-                    print("✅ BGE Reranker-v2-m3 available for reranking")
+                    self.reranker_type = _RET_CFG.get("reranker_model", "bge-reranker-v2-m3")
+                    print(f"✅ BGE Reranker ({self.reranker_type}) available")
                 else:
-                    print("⚠️ BGE reranker not available, using similarity scores only")
                     self.reranker_type = "none"
                     self.pc = None
             else:
-                print("⚠️ Pinecone not available for reranking, using similarity scores only")
                 self.reranker_type = "none"
                 self.pc = None
         except Exception as e:
@@ -89,56 +125,24 @@ class FAISSQueryProcessor:
             self.reranker_available = False
             self.reranker_type = "none"
             self.pc = None
-        
-        # Initialize Gemini with better error handling and safety settings
-        if GENAI_AVAILABLE and gemini_api_key and gemini_api_key != 'dummy':
-            try:
-                genai.configure(api_key=gemini_api_key)
-                
-                # Try different models without testing (avoid token limits)
-                model_options = [
-                    'gemini-2.5-flash',      # Most reliable
-                    'gemini-2.5-pro',       # Good alternative
-                ]
-                
-                self.model = None
-                self.model_name = None
-                
-                # Try models without testing to avoid token limit issues
-                for model_name in model_options:
-                    try:
-                        # Set generation config optimized for JSON responses (same as query_processor.py)
-                        generation_config = {
-                            "temperature": 0.7,  # Low temperature for consistent structured outputs
-                        }
-                        
-                        self.model = genai.GenerativeModel(
-                            model_name=model_name,
-                            generation_config=generation_config
-                        )
-                        self.model_name = model_name
-                        print(f"✅ Successfully initialized Gemini model: {model_name} (no test performed)")
-                        break
-                            
-                    except Exception as model_error:
-                        print(f"⚠️ Model {model_name} not accessible: {model_error}")
-                        continue
-                
-                if not self.model:
-                    print("❌ No Gemini models are accessible with the provided API key")
-                    self.model = None
-                    
-            except Exception as e:
-                print(f"Gemini initialization error: {e}")
-                self.model = None
-        else:
-            self.model = None
-            print("⚠️ Gemini API not available")
+
+        # ── Initialise inference stage (GroqEvaluator) ──────────────────────
+        self.evaluator = GroqEvaluator(
+            groq_api_key=self._groq_key,
+            reranking_method=self.reranker_type,
+            model=self.model_name,
+            temperature=self._temperature,
+            max_tokens=self._max_tokens,
+            max_retries=self._max_retries,
+        )
     
-    def search_similar_chunks(self, query: str, top_k: int = 20, rerank_top_k: int = 5) -> List[Dict]:
+    def search_similar_chunks(self, query: str, top_k: int = 20,
+                              rerank_top_k: int = 5,
+                              namespace: Optional[str] = None) -> List[Dict]:
         """
         Search for similar chunks using FAISS instead of Pinecone.
         Keeps the same reranking logic.
+        `namespace` is accepted for API consistency (FAISS uses index_name for isolation).
         """
         if not self.vector_store:
             print("❌ FAISS vector store not available")
@@ -256,16 +260,19 @@ class FAISSQueryProcessor:
             print(f"⚠️ BGE reranking error: {e}")
             return chunks[:top_k]
     
-    def process_query(self, query: str, search_top_k: int = 20, final_top_k: int = 5, 
-                     evaluation_method: str = "llm_with_quotes") -> Dict[str, Any]:
+    def process_query(self, query: str, search_top_k: int = 20, final_top_k: int = 5,
+                     evaluation_method: str = "llm_with_quotes",
+                     namespace: Optional[str] = None) -> Dict[str, Any]:
         """
         Complete query processing pipeline using FAISS.
         Same logic as original but uses FAISS for vector search.
         """
         start_time = time.time()
-        
+
         # Step 1: Search for similar chunks using FAISS
-        similar_chunks = self.search_similar_chunks(query, top_k=search_top_k, rerank_top_k=final_top_k)
+        similar_chunks = self.search_similar_chunks(
+            query, top_k=search_top_k, rerank_top_k=final_top_k, namespace=namespace
+        )
         
         if not similar_chunks:
             return {
@@ -276,7 +283,7 @@ class FAISSQueryProcessor:
                     "confidence": 0.0,
                     "search_method": "faiss_vector_search",
                     "reranking_method": self.reranker_type,
-                    "model_used": self.model_name if self.model else "none",
+                    "model_used": self.model_name,
                     "no_results": True
                 },
                 "api_status": {
@@ -296,28 +303,38 @@ class FAISSQueryProcessor:
         
         search_time = time.time()
         
-        # Step 2: Format search results
+        # Step 2: Format search results — use consistent field names expected by the response builder
         formatted_results = []
         for i, chunk in enumerate(similar_chunks):
             result = {
-                "rank": i + 1,
-                "chunk_id": chunk.get('id', f'chunk_{i}'),
-                "content": chunk.get('text', ''),
-                "document_name": chunk.get('document_name', 'unknown'),
-                "page_number": chunk.get('page_number', 0),
+                "rank":            i + 1,
+                # These exact keys are read by final_backend.py's response builder:
+                "id":              str(chunk.get('id', f'chunk_{i}')),
+                "text":            chunk.get('text', chunk.get('content', '')),
+                "score":           chunk.get('score', 0.0),
                 "similarity_score": chunk.get('score', 0.0),
-                "metadata": chunk.get('metadata', {})
+                "document_name":   chunk.get('document_name', 'unknown'),
+                "page_number":     chunk.get('page_number', 0),
+                "chunk_index":     chunk.get('chunk_index', 0),
+                "metadata":        chunk.get('metadata', {}),
             }
-            
+
             if 'rerank_score' in chunk:
                 result["rerank_score"] = chunk['rerank_score']
                 result["original_similarity_score"] = chunk.get('original_similarity_score', 0.0)
-            
+
             formatted_results.append(result)
         
-        # Step 3: LLM Evaluation (same as original)
+        # Step 3: LLM Evaluation — delegate to inference stage
         llm_start_time = time.time()
-        evaluation_result = self._evaluate_with_llm(query, similar_chunks, evaluation_method)
+        context = self._create_comprehensive_context(similar_chunks)
+        llm_answer: LLMAnswer = self.evaluator.evaluate(
+            query=query,
+            chunks=similar_chunks,
+            context=context,
+            method=evaluation_method,
+        )
+        evaluation_result = llm_answer.to_dict()
         llm_time = time.time() - llm_start_time
         
         total_time = time.time() - start_time
@@ -329,7 +346,7 @@ class FAISSQueryProcessor:
             "api_status": {
                 "faiss_search": "success",
                 "reranking": "success" if self.reranker_available else "not_available",
-                "llm_evaluation": "success" if self.model else "not_available"
+                "llm_evaluation": "success" if self.evaluator.available else "not_available"
             },
             "timing": {
                 "total_time": total_time,
@@ -340,193 +357,6 @@ class FAISSQueryProcessor:
             "status": "success",
             "success": True
         }
-    
-    def _evaluate_with_llm(self, query: str, chunks: List[Dict], method: str = "llm_with_quotes") -> Dict[str, Any]:
-        """
-        LLM evaluation logic (same as original).
-        """
-        if not self.model:
-            return {
-                "answer": "LLM evaluation not available - API key may be invalid or quota exceeded.",
-                "confidence": 0.0,
-                "search_method": "faiss_vector_search",
-                "reranking_method": self.reranker_type,
-                "model_used": "none",
-                "evaluation_method": method,
-                "llm_available": False
-            }
-        
-        # Prepare comprehensive context with adjacent chunks (same as query_processor.py)
-        context = self._create_comprehensive_context(chunks)
-        
-        # LLM prompt (updated to match query_processor.py format)
-        prompt = f"""
-        You are an insurance policy expert. Based on the comprehensive context from policy documents, provide a clear and concise answer in 2-3 sentences.
-
-        QUERY: {query}
-
-        CONTEXT FROM POLICY DOCUMENTS:
-        {context}
-
-        Instructions:
-        - These 5 vectors were reranked using BGE Reranker-v2-m3 for maximum relevance to your query
-        - Consider information from all 5 vector sections when forming your answer
-        - Look for complementary information across different sections
-        - If multiple sections discuss the same topic, synthesize the information
-        - For coverage questions, check waiting periods, exclusions, and conditions across all sections
-        - For amount/limit questions, look for specific numbers in any of the sections
-        - Don't look for exact phrases; instead, focus on the overall meaning and context.
-
-        CRITICAL: YOU MUST RETURN ONLY VALID JSON FORMAT:
-        {{
-          "answer": "Your detailed answer here "
-        }}
-
-        RULES:
-        - For yes/no questions, format your answer as "Yes, [brief reason]" or "No, [brief reason]"
-        - Even if something is not explicitly mentioned, infer from the comprehensive context provided
-        - Use information from multiple sections to provide a complete answer
-        - Be careful to consider all relevant information before making a decision
-        - RETURN ONLY THE JSON OBJECT - NO OTHER TEXT
-
-        RETURN ONLY THE JSON OBJECT:
-        """
-
-        try:
-            # Generate response using Gemini (simplified like query_processor.py)
-            response = self.model.generate_content(prompt)
-            
-            # Check response validity more carefully
-            if response and response.candidates:
-                candidate = response.candidates[0]
-                
-                # Check if response was blocked
-                if candidate.finish_reason.name != "STOP":
-                    return {
-                        "answer": f"Response blocked by safety filter: {candidate.finish_reason.name}",
-                        "confidence": 0.0,
-                        "search_method": "faiss_vector_search",
-                        "reranking_method": self.reranker_type,
-                        "model_used": self.model_name,
-                        "evaluation_method": method,
-                        "llm_available": True,
-                        "safety_block": True,
-                        "finish_reason": candidate.finish_reason.name
-                    }
-                
-                # Check if we have valid content
-                if candidate.content and candidate.content.parts:
-                    raw_answer = candidate.content.parts[0].text.strip()
-                    
-                    # Try to extract JSON from the response
-                    parsed_answer = self._extract_json_from_response(raw_answer)
-                    
-                    if parsed_answer and "answer" in parsed_answer:
-                        answer = parsed_answer["answer"]
-                    else:
-                        # Fallback to raw answer if JSON parsing fails
-                        answer = raw_answer
-                    
-                    return {
-                        "answer": answer,
-                        "confidence": 0.8,  # Static confidence value
-                        "search_method": "faiss_vector_search",
-                        "reranking_method": self.reranker_type,
-                        "model_used": self.model_name,
-                        "evaluation_method": method,
-                        "llm_available": True,
-                        "context_length": len(context),
-                        "num_sources": len(chunks),
-                        "json_parsed": parsed_answer is not None,
-                        "llm_context": context,  # Full context used by LLM
-                        "source_vectors": chunks  # Vectors used to build context
-                    }
-                else:
-                    return {
-                        "answer": "LLM response contains no valid text content.",
-                        "confidence": 0.0,
-                        "search_method": "faiss_vector_search",
-                        "reranking_method": self.reranker_type,
-                        "model_used": self.model_name,
-                        "evaluation_method": method,
-                        "llm_available": True,
-                        "error": "No content parts in response",
-                        "llm_context": context,  # Include context even for errors
-                        "source_vectors": chunks
-                    }
-            else:
-                return {
-                    "answer": "LLM did not generate any response candidates.",
-                    "confidence": 0.0,
-                    "search_method": "faiss_vector_search",
-                    "reranking_method": self.reranker_type,
-                    "model_used": self.model_name,
-                    "evaluation_method": method,
-                    "llm_available": True,
-                    "error": "No response candidates",
-                    "llm_context": context,  # Include context even for errors
-                    "source_vectors": chunks
-                }
-                
-        except Exception as e:
-            print(f"❌ LLM evaluation error: {e}")
-            return {
-                "answer": f"LLM evaluation failed: {str(e)}",
-                "confidence": 0.0,
-                "search_method": "faiss_vector_search",
-                "reranking_method": self.reranker_type,
-                "model_used": self.model_name if self.model else "none",
-                "evaluation_method": method,
-                "llm_available": False,
-                "error": str(e),
-                "llm_context": context if 'context' in locals() else "",
-                "source_vectors": chunks
-            }
-    
-    def _extract_json_from_response(self, response_text: str) -> Optional[Dict]:
-        """Helper method to robustly extract JSON from LLM responses (copied from query_processor.py)."""
-        import json
-        import re
-        
-        if not response_text or not response_text.strip():
-            print(f"🔍 Empty response, skipping JSON extraction")
-            return None
-        
-        response_text = response_text.strip()
-        
-        # Try parsing the whole response first
-        try:
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            pass
-        
-        # Look for JSON block in the response
-        if '{' in response_text and '}' in response_text:
-            try:
-                start = response_text.find('{')
-                end = response_text.rfind('}') + 1
-                json_str = response_text[start:end]
-                return json.loads(json_str)
-            except (json.JSONDecodeError, ValueError) as e:
-                print(f"🔍 JSON extraction failed: {str(e)[:50]}...")
-                print(f"🔍 Raw response preview: '{response_text[:200]}...'")
-        
-        # Try to find JSON-like content with regex
-        json_pattern = r'\{[^{}]*"answer"[^{}]*\}'
-        matches = re.findall(json_pattern, response_text, re.DOTALL)
-        if matches:
-            try:
-                return json.loads(matches[0])
-            except json.JSONDecodeError:
-                pass
-        
-        # If all else fails, try to extract just the answer content
-        answer_pattern = r'"answer":\s*"([^"]*)"'
-        answer_match = re.search(answer_pattern, response_text)
-        if answer_match:
-            return {"answer": answer_match.group(1)}
-        
-        return None
     
     def _get_adjacent_chunks_extended(self, doc_name: str, chunk_index: int, chunks_before: int = 25, chunks_after: int = 25) -> List[Dict]:
         """Retrieve extended adjacent chunks (25 before + 25 after) from the same document."""
@@ -605,73 +435,87 @@ class FAISSQueryProcessor:
             return []
     
     def _create_comprehensive_context(self, top_vectors: List[Dict]) -> str:
-        """Create comprehensive context from top 5 vectors with their adjacent chunks."""
+        """
+        Build a deduplicated, document-ordered context from the top reranked vectors.
+
+        Strategy
+        --------
+        1. Compute the desired chunk window [idx-adj_before … idx+adj_after] for every
+           top vector and union those windows per document into a single set of indices.
+        2. Fetch adjacent chunk text only for *unique* top-vector positions (avoids
+           redundant FAISS calls when the same chunk appears in multiple top results).
+        3. Emit each chunk exactly once, sorted by (document, chunk_index).
+        4. Mark chunks that are top-reranked results with 🔑 so the LLM knows which
+           sections are most relevant.
+        """
+        from collections import defaultdict
+
+        if not top_vectors:
+            return ""
+
+        # ── 1. Mark top-result positions & compute desired window per document ──
+        top_keys: set = set()             # (doc_name, chunk_index) for top-ranked chunks
+        desired: dict = defaultdict(set)  # doc_name → set of chunk indices to include
+
+        for vector in top_vectors:
+            doc_name  = vector.get("document_name", "unknown")
+            chunk_idx = vector.get("chunk_index", 0)
+            top_keys.add((doc_name, chunk_idx))
+            for ci in range(max(0, chunk_idx - self._adj_before),
+                            chunk_idx + self._adj_after + 1):
+                desired[doc_name].add(ci)
+
+        # ── 2. Build chunk text lookup — seed with top-vector texts ─────────────
+        chunk_lookup: dict = {}  # (doc_name, chunk_index) → text
+
+        for vector in top_vectors:
+            doc_name  = vector.get("document_name", "unknown")
+            chunk_idx = vector.get("chunk_index", 0)
+            text = (vector.get("text", "")
+                    or vector.get("content", "")
+                    or vector.get("metadata", {}).get("content", ""))
+            chunk_lookup[(doc_name, chunk_idx)] = text
+
+        # Fetch adjacent chunks — deduplicate calls by unique (doc, chunk) position
+        fetched: set = set()
+        for vector in top_vectors:
+            doc_name  = vector.get("document_name", "unknown")
+            chunk_idx = vector.get("chunk_index", 0)
+            if (doc_name, chunk_idx) in fetched:
+                continue                          # already fetched neighbours for this slot
+            fetched.add((doc_name, chunk_idx))
+            for adj in self._get_adjacent_chunks_extended(
+                    doc_name, chunk_idx, self._adj_before, self._adj_after):
+                key = (doc_name, adj["chunk_index"])
+                if key not in chunk_lookup:
+                    chunk_lookup[key] = adj["text"]
+
+        # ── 3. Assemble context: one section per document, chunks in order ───────
         context_sections = []
-        
-        for i, vector in enumerate(top_vectors, 1):
-            doc_name = vector.get("document_name", "unknown")
-            chunk_index = vector.get("chunk_index", 0)
-            # Get text content from multiple possible fields
-            main_text = vector.get("text", "") or vector.get("content", "") or vector.get("metadata", {}).get("content", "")
-            similarity_score = vector.get("score", 0.0)
-            
-            print(f"📄 Processing Vector {i}: Getting adjacent context for chunk {chunk_index} from {doc_name}")
-            print(f"🔍 Main text preview: {main_text[:100]}..." if len(main_text) > 100 else f"🔍 Main text: '{main_text}'")
-            if not main_text.strip():
-                print(f"⚠️ WARNING: Main text is empty for vector {i}! Vector data: {vector}")
-            
-            # Get 25 chunks before and 25 chunks after
-            adjacent_chunks = self._get_adjacent_chunks_extended(doc_name, chunk_index, 25, 25)
-            
-            # Organize chunks
-            before_chunks = [c for c in adjacent_chunks if c["position"] == "before"]
-            after_chunks = [c for c in adjacent_chunks if c["position"] == "after"]
-            
-            # Sort by distance from main chunk
-            before_chunks.sort(key=lambda x: x["distance"], reverse=True)  # Closest first
-            after_chunks.sort(key=lambda x: x["distance"])  # Closest first
-            
-            # Build the section
-            section_parts = []
-            
-            # Add header for this vector
-            section_parts.append(f"=== VECTOR {i} (Similarity: {similarity_score:.3f}) ===")
-            section_parts.append(f"Document: {doc_name}")
-            section_parts.append(f"Main Chunk Index: {chunk_index}")
-            section_parts.append("")
-            
-            # Add before context
-            if before_chunks:
-                section_parts.append(f"--- CONTEXT BEFORE (25 chunks) ---")
-                for chunk in before_chunks:
-                    section_parts.append(f"[Chunk {chunk['chunk_index']}] {chunk['text']}")
-                section_parts.append("")
-            
-            # Add main chunk
-            section_parts.append(f"--- MAIN CHUNK (Most Relevant) ---")
-            section_parts.append(f"[Chunk {chunk_index}] {main_text}")
-            section_parts.append("")
-            
-            # Add after context
-            if after_chunks:
-                section_parts.append(f"--- CONTEXT AFTER (25 chunks) ---")
-                for chunk in after_chunks:
-                    section_parts.append(f"[Chunk {chunk['chunk_index']}] {chunk['text']}")
-                section_parts.append("")
-            
-            # Add summary for this vector
-            total_context = len(before_chunks) + 1 + len(after_chunks)
-            section_parts.append(f"--- END VECTOR {i} (Total chunks: {total_context}) ---")
-            section_parts.append("")
-            
-            context_sections.append("\n".join(section_parts))
-        
-        # Combine all sections
+        total_unique = 0
+
+        for doc_name in sorted(desired):
+            indices = sorted(desired[doc_name])
+            available = [(ci, chunk_lookup[(doc_name, ci)])
+                         for ci in indices if (doc_name, ci) in chunk_lookup]
+            if not available:
+                continue
+
+            parts = [f"=== {doc_name} ===", ""]
+            prev = None
+            for ci, text in available:
+                if prev is not None and ci > prev + 1:
+                    parts.append(f"  [...gap: chunks {prev+1}–{ci-1} not in index...]")
+                marker = "🔑 [TOP RESULT] " if (doc_name, ci) in top_keys else ""
+                parts.append(f"[Chunk {ci}] {marker}{text}")
+                prev = ci
+                total_unique += 1
+            parts.append("")
+            context_sections.append("\n".join(parts))
+
         full_context = "\n".join(context_sections)
-        
-        print(f"📊 Created comprehensive context with {len(top_vectors)} vectors and their adjacent chunks")
-        print(f"📊 Total context length: {len(full_context)} characters")
-        
+        print(f"📊 Deduplicated context: {total_unique} unique chunks "
+              f"across {len(desired)} doc(s)  |  {len(full_context):,} chars")
         return full_context
     
     async def process_queries_batch(self, queries: List[str], 

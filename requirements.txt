@@ -2,6 +2,7 @@
 # Core PDF processing with Enhanced PyMuPDF
 PyMuPDF>=1.23.0  # Core PDF processing with table detection
 pandas>=2.0.0  # Data processing and table handling
+pdfplumber>=0.10.3  # For enhanced table detection
 
 # Vector Database and Embeddings (Updated for Pinecone Inference API + FAISS)
 pinecone>=5.0.0,<6.0.0  # Pinecone with inference API support (for embeddings)
@@ -14,7 +15,7 @@ langchain-community>=0.0.10  # Community extensions including FAISS
 langchain-core>=0.1.0  # Core LangChain types and interfaces
 
 # LLM Integration
-google-generativeai>=0.3.0  # Gemini AI for analysis
+groq>=0.9.0                  # Groq SDK for fast LLM inference (replaces Gemini)
 
 # Machine Learning and NLP
 numpy>=1.24.0  # Numerical computations
@@ -25,6 +26,7 @@ streamlit>=1.47.0  # Main web interface
 
 # HTTP and API calls
 requests>=2.28.0  # For API communications
+httpx>=0.27.0  # Async HTTP client for non-blocking downloads
 
 # Data processing and utilities
 python-dotenv>=1.0.0  # Environment variable management
@@ -38,3 +40,12 @@ psutil>=5.9.0
 # Utilities
 python-dotenv>=1.0.0
 rake-nltk
+PyYAML>=6.0               # config.yaml support
+
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+python-multipart>=0.0.20  # For form data handling in FastAPI
+
+# LLM providers
+google-genai>=1.0.0           # Gemini (set provider: gemini in config.yaml)

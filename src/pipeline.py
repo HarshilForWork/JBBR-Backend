@@ -10,10 +10,10 @@ import asyncio
 from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass
 
-from .parse_documents import parse_document_hybrid
-from .chunk_documents_optimized import chunk_documents_optimized
-from .embed_and_index import index_chunks_in_pinecone
-from .document_registry import DocumentRegistry
+from .data_processing.parser import parse_document_hybrid
+from .feature_engineering.chunker import chunk_documents_optimized
+from .embedding.embedder import index_chunks_in_pinecone
+from .indexing.registry import DocumentRegistry
 
 
 @dataclass
@@ -350,29 +350,25 @@ class DocumentPipeline:
 async def process_all_documents_pipeline(docs_dir: str = "docs",
                                  pinecone_api_key: Optional[str] = None,
                                  force_reprocess: bool = False,
-                                 config: Optional[PipelineConfig] = None) -> Dict[str, Any]:
+                                 config: Optional[PipelineConfig] = None,
+                                 index_name: str = "policy-index") -> Dict[str, Any]:
     """
     Single-click function to process all documents through the complete pipeline.
-    
+
     Args:
         docs_dir: Directory containing PDF documents (default: "docs")
         pinecone_api_key: Pinecone API key for vector indexing
         force_reprocess: Whether to reprocess already processed documents
         config: Pipeline configuration (uses defaults if None)
-        
+        index_name: FAISS index name — use a per-request value for isolation
+
     Returns:
         Dictionary with processing results and detailed statistics
-        
-    Example:
-        >>> result = await process_all_documents_pipeline(
-        ...     pinecone_api_key="your-key-here",
-        ...     force_reprocess=False
-        ... )
-        >>> if result["success"]:
-        ...     print(f"✅ Processed {result['statistics']['total_chunks']} chunks")
-        ... else:
-        ...     print(f"❌ Error: {result['error']}")
     """
+    if config is None:
+        config = PipelineConfig(index_name=index_name)
+    else:
+        config.index_name = index_name
     pipeline = DocumentPipeline(config)
     return await pipeline.process_all_documents(docs_dir, pinecone_api_key, force_reprocess)
 
@@ -483,73 +479,63 @@ def streamlit_single_click_pipeline_sync(pinecone_api_key: Optional[str] = None,
 
 # Query functionality for complete RAG system
 def query_documents_sync(
-    query: str, 
+    query: str,
     pinecone_api_key: Optional[str] = None,
     gemini_api_key: Optional[str] = None,
     index_name: str = "policy-index",
-    query_embedding: Optional[list] = None  # <-- Add this line
+    query_embedding: Optional[list] = None,
+    namespace: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Synchronous function to query processed documents.
-    
+
     Args:
         query: The question to ask
         pinecone_api_key: Pinecone API key for vector search
-        gemini_api_key: Gemini API key for LLM processing (optional, uses fallback if None)
-        index_name: Name of the Pinecone index to query
-        
+        gemini_api_key: Gemini/Groq API key for LLM processing
+        index_name: FAISS index name (use per-request value for isolation)
+        query_embedding: Optional precomputed embedding for the query
+        namespace: Passed through to process_query for API consistency
+
     Returns:
         Dictionary with query results and analysis
-        
-    Example:
-        >>> result = query_documents_sync(
-        ...     "What is covered under accidental death benefit?",
-        ...     pinecone_api_key="your-pinecone-key",
-        ...     gemini_api_key="your-gemini-key"
-        ... )
-        >>> print(result["evaluation"]["decision"])  # covered/not_covered/partial
     """
     try:
-        from .faiss_query_processor import FAISSQueryProcessor
+        from .retrieval.searcher import FAISSQueryProcessor
 
-        # Validate inputs
         if not query or not query.strip():
-            return {
-                "success": False,
-                "error": "Query cannot be empty",
-                "query": query
-            }
+            return {"success": False, "error": "Query cannot be empty", "query": query}
 
         if not pinecone_api_key:
             return {
                 "success": False,
                 "error": "Pinecone API key is required for embeddings (FAISS used for storage)",
-                "query": query
+                "query": query,
             }
 
-        # Use dummy key if Gemini API key not provided (fallback mode)
         if not gemini_api_key:
             gemini_api_key = "dummy"
 
-        # Initialize FAISS query processor
         processor = FAISSQueryProcessor(
             pinecone_api_key=pinecone_api_key,
             gemini_api_key=gemini_api_key,
-            index_name=index_name
+            index_name=index_name,
         )
 
-        # Process query
-        result = processor.process_query(query.strip())
+        # ❗ Pass namespace so per-request FAISS isolation flows end-to-end
+        result = processor.process_query(query.strip(), namespace=namespace)
         result["success"] = result.get("status") == "success"
-
         return result
 
     except Exception as e:
+        import traceback
+        print(f"❌ query_documents_sync exception: {e}")
+        traceback.print_exc()
         return {
             "success": False,
             "error": f"Query processing error: {str(e)}",
             "query": query,
-            "status": "error"
+            "status": "error",
         }
 
 
@@ -583,7 +569,7 @@ async def query_documents_batch_async(
         ...     print(result["evaluation"]["decision"])
     """
     try:
-        from .faiss_query_processor import FAISSQueryProcessor
+        from .retrieval.searcher import FAISSQueryProcessor
 
         # Validate inputs
         if not queries:
