@@ -237,33 +237,55 @@ def _run_pipeline_sync(
     """
     Single synchronous worker that runs the complete pipeline for one request.
     Called via loop.run_in_executor — runs in a ThreadPoolExecutor thread.
-    Uses asyncio.run() for the async PDF-processing pipeline (safe: executor
-    threads have no running event loop).
+
+    Pipeline (parallelised):
+        A (PDF parse + chunk + embed + FAISS index)  ─┐
+                                                       ├─ parallel ─→ join → C (query)
+        B (embed user queries via Pinecone)           ─┘
+
+    A and B are independent — no reason to wait for the PDF index before
+    embedding the queries.  C needs both results so it waits for the join.
 
     Each request uses its own FAISS index (index_name) for full isolation
     when multiple requests run concurrently.
-
-    Returns a result dict consumed by the async route to build the response.
     """
+    from concurrent.futures import ThreadPoolExecutor as _SubPool
+
     total_start = time.time()
 
-    # ── A: Process PDF ────────────────────────────────────────────────────
-    pdf_start  = time.time()
-    pdf_result = asyncio.run(
-        process_all_documents_pipeline(
-            docs_dir=tmpdir,
-            pinecone_api_key=pinecone_key,
-            force_reprocess=True,
-            index_name=index_name,
+    # ── Worker A: PDF ingest → FAISS index ───────────────────────────────
+    def _run_pdf():
+        t0 = time.time()
+        result = asyncio.run(
+            process_all_documents_pipeline(
+                docs_dir=tmpdir,
+                pinecone_api_key=pinecone_key,
+                force_reprocess=True,
+                index_name=index_name,
+            )
         )
-    )
-    pdf_time = time.time() - pdf_start
-    print(f"📄 PDF pipeline done in {pdf_time:.2f}s  [index={index_name}]")
+        elapsed = time.time() - t0
+        print(f"📄 PDF pipeline done in {elapsed:.2f}s  [index={index_name}]")
+        return result, elapsed
 
-    # ── B: Batch-embed all queries ────────────────────────────────────────
-    emb_start  = time.time()
-    embeddings, emb_times = _batch_embed_sync(queries, pinecone_key)
-    emb_time   = time.time() - emb_start
+    # ── Worker B: embed all queries (zero dependency on FAISS) ───────────
+    def _run_embed():
+        t0 = time.time()
+        embs, times = _batch_embed_sync(queries, pinecone_key)
+        elapsed = time.time() - t0
+        return embs, times, elapsed
+
+    # ── Run A and B in parallel, then join before C ───────────────────────
+    print("⚡ A (PDF ingest) + B (query embed) running in parallel...")
+    parallel_start = time.time()
+    with _SubPool(max_workers=2) as sub_pool:
+        fut_pdf   = sub_pool.submit(_run_pdf)
+        fut_embed = sub_pool.submit(_run_embed)
+        pdf_result, pdf_time             = fut_pdf.result()
+        embeddings, emb_times, emb_time  = fut_embed.result()
+    print(f"✅ A+B done in {time.time()-parallel_start:.2f}s  "
+          f"(PDF={pdf_time:.2f}s | embed={emb_time:.2f}s, "
+          f"saved ~{emb_time:.2f}s vs sequential)")
 
     # Guard against partial embedding failures
     if len(embeddings) < len(queries):
