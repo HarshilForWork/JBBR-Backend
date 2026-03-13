@@ -35,6 +35,19 @@ from src.pipeline import process_all_documents_pipeline, query_documents_sync
 from src.embedding.embedder import generate_query_embedding_pinecone
 from src.data_ingestion.downloader import download_pdf as _download_pdf
 
+# ── LLMOps / MLOps layer ─────────────────────────────────────────────────────
+from src.ops.metrics import (
+    ACTIVE_PIPELINES, REQUEST_COUNTER, ERROR_COUNTER,
+    EMPTY_RETRIEVAL_COUNTER, LOW_SIMILARITY_COUNTER,
+    TOKEN_USAGE_COUNTER, LLM_CONFIDENCE,
+    record_stage, metrics_app,
+    inc_tokens,
+)
+from src.ops.experiment_tracker import ExperimentTracker
+from src.ops.evaluator import RagasEvaluator
+from src.ops.alerts import AlertManager
+from src.ops.cost_tracker import CostTracker
+
 # ---------------------------------------------------------------------------
 # Load config.yaml
 # ---------------------------------------------------------------------------
@@ -48,14 +61,16 @@ def _load_config() -> dict:
         return {}
 
 _CONFIG = _load_config()
-_LLM_CFG  = _CONFIG.get("llm",         {})
-_EMB_CFG  = _CONFIG.get("embedding",   {})
-_RET_CFG  = _CONFIG.get("retrieval",   {})
-_LOG_CFG  = _CONFIG.get("logging",     {})
-_SRV_CFG  = _CONFIG.get("server",      {})
-_CON_CFG  = _CONFIG.get("concurrency", {})
-_STR_CFG  = _CONFIG.get("storage",     {})
-_EXE_CFG  = _CONFIG.get("executor",    {})
+_LLM_CFG  = _CONFIG.get("llm",              {})
+_EMB_CFG  = _CONFIG.get("embedding",        {})
+_RET_CFG  = _CONFIG.get("retrieval",        {})
+_LOG_CFG  = _CONFIG.get("logging",          {})
+_SRV_CFG  = _CONFIG.get("server",           {})
+_CON_CFG  = _CONFIG.get("concurrency",      {})
+_STR_CFG  = _CONFIG.get("storage",          {})
+_EXE_CFG  = _CONFIG.get("executor",         {})
+_OPS_ET   = _CONFIG.get("experiment_tracking", {})
+_OPS_EVAL = _CONFIG.get("evaluation",       {})
 
 # Resolved runtime values
 _INDEX_NAME      = _RET_CFG.get("index_name",          "policy-index")
@@ -144,6 +159,17 @@ async def lifespan(app):
     t = threading.Thread(target=_cleanup_loop, daemon=True, name="faiss-ttl-cleanup")
     t.start()
     print(f"🧹 FAISS TTL cleanup thread started (TTL={_INDEX_TTL_SECONDS}s, sweep every 3600s)")
+
+    # ── LLMOps singletons (created once per process) ──
+    if _OPS_ET.get("enabled", True):
+        app.state.tracker = ExperimentTracker(
+            experiment_name=_OPS_ET.get("experiment_name", "hackrx-rag")
+        )
+    else:
+        app.state.tracker = None
+    app.state.evaluator = RagasEvaluator()
+    app.state.alerts    = AlertManager()
+
     yield
     # ── shutdown ──
     EXECUTOR.shutdown(wait=False)
@@ -164,6 +190,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Prometheus /metrics endpoint ──────────────────────────────────────────────
+app.mount("/metrics", metrics_app)
 
 
 # ---------------------------------------------------------------------------
@@ -252,88 +281,90 @@ def _run_pipeline_sync(
     from concurrent.futures import ThreadPoolExecutor as _SubPool
 
     total_start = time.time()
-
-    # ── Worker A: PDF ingest → FAISS index ───────────────────────────────
-    def _run_pdf():
-        t0 = time.time()
-        result = asyncio.run(
-            process_all_documents_pipeline(
-                docs_dir=tmpdir,
-                pinecone_api_key=pinecone_key,
-                force_reprocess=True,
-                index_name=index_name,
+    ACTIVE_PIPELINES.inc()
+    try:
+        def _run_pdf():
+            t0 = time.time()
+            result = asyncio.run(
+                process_all_documents_pipeline(
+                    docs_dir=tmpdir,
+                    pinecone_api_key=pinecone_key,
+                    force_reprocess=True,
+                    index_name=index_name,
+                )
             )
-        )
-        elapsed = time.time() - t0
-        print(f"📄 PDF pipeline done in {elapsed:.2f}s  [index={index_name}]")
-        return result, elapsed
+            elapsed = time.time() - t0
+            print(f"📄 PDF pipeline done in {elapsed:.2f}s  [index={index_name}]")
+            return result, elapsed
 
-    # ── Worker B: embed all queries (zero dependency on FAISS) ───────────
-    def _run_embed():
-        t0 = time.time()
-        embs, times = _batch_embed_sync(queries, pinecone_key)
-        elapsed = time.time() - t0
-        return embs, times, elapsed
+        # ── Worker B: embed all queries (zero dependency on FAISS) ───────────
+        def _run_embed():
+            t0 = time.time()
+            embs, times = _batch_embed_sync(queries, pinecone_key)
+            elapsed = time.time() - t0
+            return embs, times, elapsed
 
-    # ── Run A and B in parallel, then join before C ───────────────────────
-    print("⚡ A (PDF ingest) + B (query embed) running in parallel...")
-    parallel_start = time.time()
-    with _SubPool(max_workers=2) as sub_pool:
-        fut_pdf   = sub_pool.submit(_run_pdf)
-        fut_embed = sub_pool.submit(_run_embed)
-        pdf_result, pdf_time             = fut_pdf.result()
-        embeddings, emb_times, emb_time  = fut_embed.result()
-    print(f"✅ A+B done in {time.time()-parallel_start:.2f}s  "
-          f"(PDF={pdf_time:.2f}s | embed={emb_time:.2f}s, "
-          f"saved ~{emb_time:.2f}s vs sequential)")
+        # ── Run A and B in parallel, then join before C ───────────────────────
+        print("⚡ A (PDF ingest) + B (query embed) running in parallel...")
+        parallel_start = time.time()
+        with _SubPool(max_workers=2) as sub_pool:
+            fut_pdf   = sub_pool.submit(_run_pdf)
+            fut_embed = sub_pool.submit(_run_embed)
+            pdf_result, pdf_time             = fut_pdf.result()
+            embeddings, emb_times, emb_time  = fut_embed.result()
+        print(f"✅ A+B done in {time.time()-parallel_start:.2f}s  "
+              f"(PDF={pdf_time:.2f}s | embed={emb_time:.2f}s, "
+              f"saved ~{emb_time:.2f}s vs sequential)")
 
-    # Guard against partial embedding failures
-    if len(embeddings) < len(queries):
-        pad = len(queries) - len(embeddings)
-        print(f"⚠️ {pad} embeddings missing — padding with zero vectors")
-        embeddings.extend([[0.0] * 1024] * pad)
-        emb_times.extend([0.0] * pad)
+        # Guard against partial embedding failures
+        if len(embeddings) < len(queries):
+            pad = len(queries) - len(embeddings)
+            print(f"⚠️ {pad} embeddings missing — padding with zero vectors")
+            embeddings.extend([[0.0] * 1024] * pad)
+            emb_times.extend([0.0] * pad)
 
-    # ── C: Process each query sequentially ───────────────────────────────
-    q_start      = time.time()
-    query_results = []
-    query_times   = []
-    for i, (q, emb) in enumerate(zip(queries, embeddings)):
-        qt0 = time.time()
-        try:
-            r = query_documents_sync(
-                query=q,
-                pinecone_api_key=pinecone_key,
-                gemini_api_key=groq_key,
-                index_name=index_name,
-                query_embedding=emb,
-            )
-        except Exception as exc:
-            print(f"  ❌ Query {i+1} failed: {exc}")
-            r = {
-                "evaluation": {"answer": f"Query processing error: {exc}", "confidence": 0.0},
-                "search_results": [],
-                "success": False,
-            }
-        elapsed = time.time() - qt0
-        query_times.append(elapsed)
-        query_results.append(r)
-        print(f"  ✅ Query {i+1}/{len(queries)} done in {elapsed:.2f}s")
-    q_time = time.time() - q_start
+        # ── C: Process each query sequentially ───────────────────────────────
+        q_start      = time.time()
+        query_results = []
+        query_times   = []
+        for i, (q, emb) in enumerate(zip(queries, embeddings)):
+            qt0 = time.time()
+            try:
+                r = query_documents_sync(
+                    query=q,
+                    pinecone_api_key=pinecone_key,
+                    gemini_api_key=groq_key,
+                    index_name=index_name,
+                    query_embedding=emb,
+                )
+            except Exception as exc:
+                print(f"  ❌ Query {i+1} failed: {exc}")
+                r = {
+                    "evaluation": {"answer": f"Query processing error: {exc}", "confidence": 0.0},
+                    "search_results": [],
+                    "success": False,
+                }
+            elapsed = time.time() - qt0
+            query_times.append(elapsed)
+            query_results.append(r)
+            print(f"  ✅ Query {i+1}/{len(queries)} done in {elapsed:.2f}s")
+        q_time = time.time() - q_start
 
-    return {
-        "pdf_result":    pdf_result,
-        "embeddings":    embeddings,
-        "emb_times":     emb_times,
-        "query_results": query_results,
-        "query_times":   query_times,
-        "timings": {
-            "pdf":       pdf_time,
-            "embedding": emb_time,
-            "queries":   q_time,
-            "pipeline":  time.time() - total_start,
-        },
-    }
+        return {
+            "pdf_result":    pdf_result,
+            "embeddings":    embeddings,
+            "emb_times":     emb_times,
+            "query_results": query_results,
+            "query_times":   query_times,
+            "timings": {
+                "pdf":       pdf_time,
+                "embedding": emb_time,
+                "queries":   q_time,
+                "pipeline":  time.time() - total_start,
+            },
+        }
+    finally:
+        ACTIVE_PIPELINES.dec()
 
 
 # ---------------------------------------------------------------------------
@@ -518,8 +549,109 @@ async def query_pdf(input: QueryPDFRequest):
             },
         },
     }
+    # ── LLMOps instrumentation ────────────────────────────────────────────
+    _tracker  = getattr(app.state, "tracker",  None)
+    _alerts   = getattr(app.state, "alerts",   None)
+    _evaluator = getattr(app.state, "evaluator", None)
 
-    # ── Logging ───────────────────────────────────────────────────────────
+    # 1. Prometheus counters / confidence histogram
+    model_label = (
+        _LLM_CFG.get("gemini_model", "gemini-2.0-flash")
+        if _LLM_CFG.get("provider", "groq") == "gemini"
+        else _LLM_CFG.get("model", "llama-3.3-70b-versatile")
+    )
+    REQUEST_COUNTER.labels(endpoint="run", status="success").inc()
+    for i, qr in enumerate(query_results):
+        ev = qr.get("evaluation", {})
+        conf = float(ev.get("confidence", 0.0))
+        LLM_CONFIDENCE.labels(model=model_label).observe(conf)
+
+        # Token metrics
+        p_tok = int(ev.get("prompt_tokens", 0))
+        c_tok = int(ev.get("completion_tokens", 0))
+        if p_tok or c_tok:
+            inc_tokens(model_label, p_tok, c_tok)
+
+        # Empty retrieval counter
+        if not qr.get("search_results"):
+            EMPTY_RETRIEVAL_COUNTER.inc()
+
+    # Stage timing histograms
+    for stage_key, prom_label in [
+        ("pdf", "pdf"), ("embedding", "embed"), ("queries", "llm")
+    ]:
+        dur = timings.get(stage_key, 0.0)
+        if dur > 0:
+            from src.ops.metrics import PIPELINE_DURATION
+            PIPELINE_DURATION.labels(stage=prom_label).observe(dur)
+
+    # 2. Alert checks
+    if _alerts:
+        _alerts.check_latency(total_time, performance_stats, session_id or "")
+        for i, (q, qr) in enumerate(zip(queries, query_results)):
+            svecs = qr.get("search_results", [])
+            _alerts.check_retrieval(svecs, q, pdf_filename, session_id or "")
+            ev    = qr.get("evaluation", {})
+            conf  = float(ev.get("confidence", 0.0))
+            ans   = ev.get("answer", "")
+            _alerts.check_confidence(conf, q, pdf_filename, ans, session_id or "")
+
+    # 3. RAGAS evaluation (fire-and-forget background thread)
+    if _evaluator and _OPS_EVAL.get("enabled", True):
+        def _on_eval_done(metrics: dict):
+            if _alerts:
+                for q in queries:
+                    _alerts.check_eval_metrics(metrics, q, pdf_filename, session_id or "")
+            if _tracker:
+                import threading as _th
+                pass  # metrics will be added to MLflow via the tracker call below
+
+        for i, (q, qr) in enumerate(zip(queries, query_results)):
+            ev   = qr.get("evaluation", {})
+            svecs = qr.get("search_results", [])
+            emb  = all_embs[i] if i < len(all_embs) else None
+            _evaluator.evaluate_async(
+                query=q,
+                query_embedding=emb,
+                answer=ev.get("answer", ""),
+                context=ev.get("llm_context", ""),
+                source_vectors=svecs,
+                confidence=float(ev.get("confidence", 0.0)),
+                session_id=session_id or "",
+                pdf_filename=pdf_filename,
+                on_complete=_on_eval_done,
+            )
+
+    # 4. MLflow run log (first query as representative)
+    if _tracker and query_results:
+        first_ev  = query_results[0].get("evaluation", {})
+        total_p   = sum(int(qr.get("evaluation", {}).get("prompt_tokens", 0))     for qr in query_results)
+        total_c   = sum(int(qr.get("evaluation", {}).get("completion_tokens", 0)) for qr in query_results)
+        ct        = CostTracker(model=model_label)
+        ct.prompt_tokens     = total_p
+        ct.completion_tokens = total_c
+        _tracker.log_run(
+            session_id=session_id or "unknown",
+            user_id=user_id    or "unknown",
+            endpoint="/hackrx/run",
+            pipeline_params={
+                "model":           model_label,
+                "embedding_model": _EMB_MODEL,
+                "top_k":           _RET_CFG.get("top_k", 5),
+                "chunk_size":      _CONFIG.get("chunking", {}).get("chunk_size", 1000),
+                "llm_provider":    _LLM_CFG.get("provider", "groq"),
+                "num_queries":     len(queries),
+            },
+            stage_timings={
+                "download": download_time,
+                **timings,
+            },
+            token_usage=ct.summary(),
+            eval_metrics={
+                "avg_confidence": sum(confidences) / len(confidences) if confidences else 0,
+            },
+        )
+
     if _LOG_CFG.get("enabled", True):
         try:
             os.makedirs(_LOG_DIR, exist_ok=True)

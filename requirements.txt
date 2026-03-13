@@ -49,3 +49,10 @@ python-multipart>=0.0.20  # For form data handling in FastAPI
 
 # LLM providers
 google-genai>=1.0.0           # Gemini (set provider: gemini in config.yaml)
+
+# LLMOps / MLOps
+prometheus-client>=0.20.0     # Metrics + /metrics endpoint
+tiktoken>=0.7.0               # Token counting for cost tracking
+mlflow>=2.12.0                # Experiment tracking SDK
+dagshub>=0.3.0                # DagsHub MLflow backend
+

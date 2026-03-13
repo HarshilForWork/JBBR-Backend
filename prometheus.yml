@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s # Scrape targets every 5 seconds
+
+scrape_configs:
+  - job_name: 'jbbr-backend'
+    metrics_path: '/metrics'
+    static_configs:
+      # Use host.docker.internal to reach the FastAPI app running on the host machine
+      - targets: ['host.docker.internal:8085']

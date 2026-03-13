@@ -37,6 +37,13 @@ except ImportError:
 from .schema import LLMAnswer
 from .prompt import SYSTEM_MESSAGE, build_policy_qa_prompt
 
+# ── LLMOps: cost tracking ─────────────────────────────────────────────────────
+try:
+    from src.ops.cost_tracker import CostTracker as _CostTracker
+    _COST_TRACKING = True
+except ImportError:
+    _COST_TRACKING = False
+
 # ── Config loader ─────────────────────────────────────────────────────────────
 import os as _os
 import yaml as _yaml
@@ -161,7 +168,7 @@ class GroqEvaluator:
 
         for attempt in range(self.max_retries + 1):
             try:
-                raw = self._call_llm(prompt)
+                raw, p_tok, c_tok = self._call_llm(prompt)
                 parsed = _extract_json(raw)
                 answer = parsed["answer"] if (parsed and "answer" in parsed) else raw
 
@@ -185,6 +192,8 @@ class GroqEvaluator:
                     num_sources=len(chunks),
                     llm_context=context,
                     source_vectors=chunks,
+                    prompt_tokens=p_tok,
+                    completion_tokens=c_tok,
                 )
 
             except Exception as exc:
@@ -224,13 +233,20 @@ class GroqEvaluator:
 
     # ── Provider-specific call routing ────────────────────────────────────────
 
-    def _call_llm(self, prompt: str) -> str:
-        """Route to the correct provider SDK and return raw text response."""
+    def _call_llm(self, prompt: str) -> tuple[str, int, int]:
+        """Route to the correct provider SDK. Returns (raw_text, prompt_tokens, completion_tokens)."""
         if self.provider == "gemini":
-            return self._call_gemini(prompt)
+            text = self._call_gemini(prompt)
+            # Estimate tokens via tiktoken for non-Groq providers
+            if _COST_TRACKING:
+                ct = _CostTracker(self.model_name)
+                p_tok, c_tok = ct.record_llm_call(prompt, text)
+            else:
+                p_tok, c_tok = 0, 0
+            return text, p_tok, c_tok
         return self._call_groq(prompt)
 
-    def _call_groq(self, prompt: str) -> str:
+    def _call_groq(self, prompt: str) -> tuple[str, int, int]:
         kwargs = dict(
             model=self.model_name,
             messages=[
@@ -242,7 +258,11 @@ class GroqEvaluator:
         if self.max_tokens is not None:
             kwargs["max_tokens"] = self.max_tokens
         response = self._client.chat.completions.create(**kwargs)
-        return response.choices[0].message.content.strip()
+        # Extract token counts directly from Groq's usage object
+        usage  = getattr(response, "usage", None)
+        p_tok  = getattr(usage, "prompt_tokens",     0) if usage else 0
+        c_tok  = getattr(usage, "completion_tokens", 0) if usage else 0
+        return response.choices[0].message.content.strip(), p_tok, c_tok
 
     def _call_gemini(self, prompt: str) -> str:
         cfg_kwargs = dict(

@@ -27,6 +27,8 @@ class LLMAnswer:
     llm_context     : Full context string that was sent to the LLM.
     source_vectors  : Raw retrieved chunk dicts (for downstream logging).
     error           : Error message if evaluation failed, else None.
+    prompt_tokens   : Prompt token count (from tiktoken or API response).
+    completion_tokens: Completion token count.
     """
     answer:           str
     confidence:       float             = 0.0
@@ -41,6 +43,8 @@ class LLMAnswer:
     llm_context:      str               = ""
     source_vectors:   List[Dict[str, Any]] = field(default_factory=list)
     error:            Optional[str]     = None
+    prompt_tokens:    int               = 0
+    completion_tokens: int              = 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to plain dict for JSON serialisation."""

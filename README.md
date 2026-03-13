@@ -9,8 +9,9 @@ This project is an advanced **retrieval-augmented generation (RAG)** system desi
 The system is built on a modular pipeline architecture that decouples document ingestion from query processing.
 
 ### High-Level Flow
-1.  **Ingestion Phase**: PDFs ➡ Parsing ➡ Chunking ➡ Embedding ➡ Vector Storage (Pinecone/FAISS).
-2.  **Query Phase**: User Query ➡ Vector Search ➡ Context Retrieval ➡ LLM (Gemini) ➡ Answer Generation.
+1. **Ingestion Phase**: PDFs ➡ Parsing ➡ Chunking ➡ Embedding ➡ Vector Storage (Pinecone/FAISS).
+2. **Query Phase**: User Query ➡ Vector Search ➡ Context Retrieval ➡ LLM (Gemini) ➡ Answer Generation.
+3. **LLMOps Phase**: Observability Hooks ➡ Background Evaluation ➡ Experiment Logging ➡ Alerting.
 
 ---
 
@@ -77,28 +78,43 @@ Performance is critical when handling large PDFs and complex RAG queries. We imp
     *   We utilize **`concurrent.futures.ThreadPoolExecutor`** to handle multiple user questions simultaneously.
     *   Instead of processing 5 queries sequentially (which would take Sum(T1...T5)), we run them in parallel threads, reducing total latency to approximately Max(T1...T5).
     *   The system includes a **speedup calculator** that logs the efficiency gain (e.g., "5.00s parallel vs 20.00s sequential").
-*   **Multithreaded Embedding Generation**:
-    *   Vector embedding generation is offloaded to a thread pool (max 10 workers) to maximize throughput against the Pinecone Inference API.
-    *   Prevents network bottlenecks during the initial vectorization phase.
+* **Multithreaded Embedding Generation**:
+  * Vector embedding generation is offloaded to a thread pool (max 10 workers) to maximize throughput against the Pinecone Inference API.
+  * Prevents network bottlenecks during the initial vectorization phase.
+
+### 7. Production LLMOps & MLOps (`src/ops/`)
+
+The system is instrumented for production-grade monitoring and continuous improvement:
+
+* **Deep Observability**: A dedicated Prometheus suite tracks system health (latencies, token costs, model confidence).
+* **Experiment Tracking**: Every request is logged to **MLflow (via DagsHub)**, capturing every parameter and prompt version for full reproducibility.
+* **Async Quality Evaluation**: Implements a non-blocking **RAGAS-style evaluator** that computes *Context Relevance* and *Faithfulness* heuristics in real-time without adding request latency.
+* **Cost Management**: Granular token counting via `tiktoken` predicts costs per request and cumulative session spend.
 
 ---
 
 ## 💻 Tech Stack
 
-*   **Frontend**: Streamlit (Processing & Chat UI).
-*   **Core Logic**: Python 3.9+.
-*   **PDF Processing**:
-    *   `pdfplumber`: Advanced table extraction.
-    *   `PyMuPDF` (fitz): Layout and text extraction.
-*   **Vector Store**:
-    *   `Pinecone`: Cloud vector database.
-    *   `FAISS`: Efficient local vector search.
-*   **AI & ML**:
-    *   **LLM**: Google Gemini 2.5 (Flash & Pro) via `google-generativeai`.
-    *   **Embeddings**: `multilingual-e5-large` (via Pinecone Inference).
-    *   **Reranking**: `bge-reranker-v2-m3` (via Pinecone Inference).
-    *   **Utilities**: `pandas` (data manipulation), `numpy`.
-*   **Orchestration**: Custom `DocumentPipeline` implementation.
+* **Frontend**: Streamlit (Processing & Chat UI).
+* **Core Logic**: Python 3.9+.
+* **PDF Processing**:
+  * `pdfplumber`: Advanced table extraction.
+  * `PyMuPDF` (fitz): Layout and text extraction.
+* **Vector Store**:
+  * `Pinecone`: Cloud vector database.
+  * `FAISS`: Efficient local vector search.
+* **AI & ML**:
+  * **LLM**: Google Gemini 2.0 (via `google-genai`).
+  * **Embeddings**: `multilingual-e5-large` (via Pinecone Inference).
+  * **Reranking**: `bge-reranker-v2-m3` (via Pinecone Inference).
+  * **Guardrails**: Similarity-based abstain logic.
+* **LLMOps & Monitoring**:
+  * **MLflow + DagsHub**: Experiment tracking and artifact storage.
+  * **Prometheus**: Real-time metric collection and `/metrics` endpoint.
+  * **Tiktoken**: Precision token counting for cost estimation.
+  * **YAML Config**: Centralized threshold management.
+* **Utilities**: `pandas`, `numpy`, `PyYAML`, `python-dotenv`.
+* **Orchestration**: Custom `DocumentPipeline` implementation.
 
 ---
 
@@ -106,18 +122,19 @@ Performance is critical when handling large PDFs and complex RAG queries. We imp
 
 ```bash
 JBBR-Backend/
-├── app.py                      # Main Streamlit application entry point
+├── final_backend.py            # Main high-performance FastAPI server
+├── config.yaml                 # Central system configuration
 ├── requirements.txt            # Project dependencies
-├── backend.py & variants       # Backend logic (legacy/variants)
 ├── src/                        # Core source code
-│   ├── pipeline.py             # Orchestrates the entire ingestion process
+│   ├── ops/                    # [NEW] LLMOps layer (Metrics, Eval, Tracking)
+│   ├── retrieval/              # Smart vector retrieval & reranking
+│   ├── inference/              # LLM providers & prompt logic
+│   ├── indexing/               # Document versioning & registry
 │   ├── parse_documents.py      # PDF parsing logic
-│   ├── chunk_documents_optimized.py # Smart chunking logic
-│   ├── embed_and_index.py      # Embedding generation and indexing
-│   ├── faiss_query_processor.py # Query logic specifically for FAISS/Hybrid
-│   ├── document_registry.py    # Tracks processed files
+│   ├── pipeline.py             # Orchestration logic
 │   └── ...
-├── docs/                       # Directory to place input PDFs
+├── logs/                       # System alerts and evaluation results
+├── request_logs/               # Detailed JSON logs of every API call
 └── faiss_storage/              # Local FAISS index storage
 ```
 
@@ -151,7 +168,60 @@ streamlit run app.py
 ```
 
 ### 5. Using the System
-1.  **Upload**: Place your insurance policy PDFs in the `docs/` folder.
-2.  **Process**: Click "Process Documents" in the sidebar. This runs the ingestion pipeline.
-3.  **Query**: Type your question (e.g., "Is dental surgery covered?") in the main input box.
-4.  **Review**: See the answer, confidence score, and specific source citations.
+1.  **Upload**: Provide a PDF URL or upload via the API.
+2.  **Process**: The system downloads, parses, and indexes the document into an isolated FAISS session.
+3.  **Query**: Submit natural language questions (e.g., "Is dental surgery covered?").
+4.  **Review**: See the answer, confidence score, source citations, and check the MLflow dashboard for eval metrics.
+
+---
+
+## 📊 Monitoring & Reliability
+
+### Prometheus Metrics
+
+Exposed at `/metrics`. Tracks:
+
+* `rag_pipeline_duration_seconds`: Latency breakdown by stage.
+* `rag_token_usage_total`: Exact consumption by model.
+* `rag_active_pipelines`: Real-time concurrency gauge.
+* `rag_empty_retrieval_total`: Signal for indexing issues.
+
+### Guardrails
+
+* **Similarity Threshold**: If top search results are below $0.15$, the system abstains from answering to prevent hallucinations.
+* **Similarity Threshold**: If top search results are below $0.15$, the system abstains from answering to prevent hallucinations.
+* **AlertManager**: Automatically triggers alerts (`HIGH_LATENCY`, `LOW_CONFIDENCE`, `METRIC_DRIFT`) into `logs/alerts.jsonl`.
+* **Background Evaluation**: Detailed RAG quality metrics (faithfulness, relevance) logged to `logs/eval_results.jsonl`. No external Ragas server is required; evaluation runs optimally in the backend daemon threads.
+
+---
+
+## 📈 Running the Observability Stack (Local)
+
+To view real-time metrics in Grafana without installing software directly on your machine, you can run Prometheus and Grafana via Docker.
+
+### 1. Requirements
+
+* [Docker Desktop](https://docs.docker.com/desktop/) installed and running on your machine.
+* The JBBR-Backend must be running (e.g., `uv run python final_backend.py` on port 8085).
+
+### 2. Start the Stack
+
+Run the following command in the `JBBR-Backend` directory where the `docker-compose.yml` file is located:
+
+```bash
+docker compose up -d
+```
+
+### 3. Access the Dashboards
+
+* **Prometheus**: Go to [http://localhost:9090](http://localhost:9090)
+  * Go to **Status > Targets** to ensure it successfully connected to `host.docker.internal:8085`.
+* **Grafana**: Go to [http://localhost:3000](http://localhost:3000)
+  * **Login**: Username `admin`, Password `admin`.
+  * **Add Data Source**: Go to Data Sources, add Prometheus, and set the URL to `http://prometheus:9090`.
+  * **Create Dashboard**: You can now create visual dashboards for metrics like `rag_pipeline_duration_seconds` and `rag_token_usage_total`.
+
+To stop the monitoring stack, run:
+```bash
+docker compose down
+```

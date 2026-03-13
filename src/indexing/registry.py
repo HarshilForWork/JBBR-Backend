@@ -85,16 +85,60 @@ class DocumentRegistry:
         return [filename for filename, stat in status.items() 
                 if stat in ['new', 'changed']]
     
-    def mark_document_indexed(self, filename: str, file_path: str, chunk_count: int):
-        """Mark a document as successfully indexed"""
+    def mark_document_indexed(
+        self,
+        filename: str,
+        file_path: str,
+        chunk_count: int,
+        embedding_model: str = "unknown",
+        embedding_dimension: int = 0,
+    ):
+        """Mark a document as successfully indexed, recording the embedding model used."""
         file_hash = self._get_file_hash(file_path)
         self.registry[filename] = {
-            'hash': file_hash,
-            'indexed_at': datetime.now().isoformat(),
-            'chunk_count': chunk_count,
-            'file_size': os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            'hash':                file_hash,
+            'indexed_at':          datetime.now().isoformat(),
+            'chunk_count':         chunk_count,
+            'file_size':           os.path.getsize(file_path) if os.path.exists(file_path) else 0,
+            # ── LLMOps: index lifecycle tracking ──────────────────────────────
+            'embedding_model':     embedding_model,
+            'embedding_dimension': embedding_dimension,
         }
         self._save_registry()
+
+    def needs_reindex(
+        self,
+        filename: str,
+        current_embedding_model: str,
+        current_dimension: int = 0,
+    ) -> bool:
+        """
+        Return True if the document must be re-embedded because the embedding
+        model or dimension has changed since it was last indexed.
+
+        LLMOps: vectors built with an old model are incompatible with a new one.
+        """
+        entry = self.registry.get(filename)
+        if not entry:
+            return True  # Never indexed
+        stored_model = entry.get("embedding_model", "")
+        stored_dim   = entry.get("embedding_dimension", 0)
+        if stored_model and stored_model != current_embedding_model:
+            print(
+                f"⚠️  [Registry] Embedding model changed "
+                f"({stored_model} → {current_embedding_model}). "
+                f"Re-indexing '{filename}'."
+            )
+            return True
+        if current_dimension and stored_dim and stored_dim != current_dimension:
+            print(
+                f"⚠️  [Registry] Embedding dimension changed "
+                f"({stored_dim} → {current_dimension}). "
+                f"Re-indexing '{filename}'."
+            )
+            return True
+        return False
+
     
     def remove_document(self, filename: str):
         """Remove document from registry"""

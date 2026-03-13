@@ -196,14 +196,27 @@ class FAISSQueryProcessor:
                 try:
                     print(f"🔄 Reranking {len(chunks)} chunks with BGE Reranker-v2-m3...")
                     reranked_chunks = self._rerank_chunks_bge(query, chunks, top_k=rerank_top_k)
-                    print(f"✅ Reranking complete, returning top {len(reranked_chunks)} chunks")
-                    return reranked_chunks
+                    final_chunks = reranked_chunks
                 except Exception as e:
                     print(f"⚠️ Reranking failed: {e}, using similarity scores only")
-                    return chunks[:rerank_top_k]
+                    final_chunks = chunks[:rerank_top_k]
             else:
                 print(f"📊 Using similarity scores only, returning top {rerank_top_k} chunks")
-                return chunks[:rerank_top_k]
+                final_chunks = chunks[:rerank_top_k]
+
+            # ── Guardrail: Abstain if similarity is too low ─────────────────
+            abstain_thresh = float(_CFG.get("guardrails", {}).get("abstain_below_similarity", 0.15))
+            if final_chunks:
+                # Use best of similarity or rerank score
+                top_score = max(
+                    final_chunks[0].get("score", 0.0),
+                    final_chunks[0].get("rerank_score", 0.0)
+                )
+                if top_score < abstain_thresh:
+                    print(f"🚫 [Guardrail] Top score {top_score:.4f} < {abstain_thresh} (abstain).")
+                    return []
+
+            return final_chunks
                 
         except Exception as e:
             print(f"❌ Error searching similar chunks: {e}")
