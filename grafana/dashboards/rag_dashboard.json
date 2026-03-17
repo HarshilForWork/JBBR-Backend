@@ -1,0 +1,54 @@
+{
+  "title": "LLMOps RAG Monitoring",
+  "tags": ["rag", "llmops"],
+  "timezone": "browser",
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Requests",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum(rag_requests_total)", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "Empty Retrievals",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "sum(rag_empty_retrieval_total)", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Pipeline Latency (P95) by Stage",
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(rag_pipeline_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{stage}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Token Usage Rate",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum by (token_type) (rate(rag_token_usage_total[5m]))",
+          "legendFormat": "{{token_type}}"
+        }
+      ]
+    },
+    {
+      "type": "heatmap",
+      "title": "LLM Confidence Distribution",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by(le) (rate(rag_llm_confidence_bucket[5m]))",
+          "format": "heatmap"
+        }
+      ]
+    }
+  ]
+}

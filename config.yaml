@@ -3,6 +3,16 @@
 # All tuneable parameters in one place.
 # ============================================================
 
+# ── Mode Toggle ──────────────────────────────────────────────
+# testing: true  → MLflow (DagsHub) logging ONLY per request.
+#                   Prometheus/Grafana counters and AlertManager
+#                   checks are SKIPPED so test noise stays out of
+#                   the production monitoring dashboards.
+# testing: false → Production mode. Prometheus/Grafana + AlertManager
+#                   run normally. MLflow logging is SKIPPED to avoid
+#                   polluting your experiment history with prod traffic.
+testing: true
+
 # ── LLM ─────────────────────────────────────────────────────
 llm:
   # ── Provider switch ───────────────────────────────────────
@@ -80,20 +90,20 @@ server:
   port: 8000
   reload: true # Hot-reload (dev only, disable in prod)
 
-#  Guardrails 
+# Guardrails
 guardrails:
   min_similarity_score: 0.30     # Alert + flag when top retrieval score is below this
   min_confidence: 0.50           # Alert when LLM confidence is below this
   abstain_below_similarity: 0.15 # Return "Insufficient context" answer below this
 
-#  Evaluation (RAGAS-style) -
+# Evaluation (RAGAS-style)
 evaluation:
   enabled: true
   background: true               # Run async post-response (zero request latency impact)
   faithfulness_threshold: 0.40   # Alert when faithfulness drops below this
   context_relevance_threshold: 0.50
 
-#  Alerting 
+# Alerting
 alerting:
   enabled: true
   alert_log: logs/alerts.jsonl   # Structured JSONL alert log
@@ -101,7 +111,7 @@ alerting:
   max_errors_per_minute: 5       # HIGH_ERROR_RATE alert threshold
   ragas_drift_threshold: 0.20    # RAGAS_METRIC_DRIFT: alert on >20% rolling drop
 
-#  Experiment Tracking (MLflow -> DagsHub) 
+# Experiment Tracking (MLflow -> DagsHub)
 experiment_tracking:
   enabled: true
   experiment_name: hackrx-rag    # MLflow experiment name in DagsHub
@@ -110,7 +120,7 @@ experiment_tracking:
   #   DAGSHUB_REPO_OWNER=<github-username>
   #   DAGSHUB_REPO_NAME=<dagshub-repo>
 
-#  Cost Tracking 
+# Cost Tracking
 cost:
   groq_input_per_1k_tokens: 0.0001    # USD per 1K prompt tokens (Groq)
   groq_output_per_1k_tokens: 0.0002   # USD per 1K completion tokens (Groq)

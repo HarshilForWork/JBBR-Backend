@@ -72,6 +72,13 @@ _EXE_CFG  = _CONFIG.get("executor",         {})
 _OPS_ET   = _CONFIG.get("experiment_tracking", {})
 _OPS_EVAL = _CONFIG.get("evaluation",       {})
 
+# Testing-mode toggle from config.yaml (testing: true/false)
+# true  → MLflow only, skip Prometheus/Grafana/AlertManager
+# false → Prometheus/Grafana/AlertManager, skip MLflow
+_TESTING_MODE: bool = bool(_CONFIG.get("testing", False))
+_mode_label = "TESTING" if _TESTING_MODE else "PRODUCTION"
+print(f"🔀 Observability mode: {_mode_label} ({'MLflow only' if _TESTING_MODE else 'Prometheus/Grafana only'})")
+
 # Resolved runtime values
 _INDEX_NAME      = _RET_CFG.get("index_name",          "policy-index")
 _LOG_DIR         = _LOG_CFG.get("log_dir",             "request_logs")
@@ -554,103 +561,90 @@ async def query_pdf(input: QueryPDFRequest):
     _alerts   = getattr(app.state, "alerts",   None)
     _evaluator = getattr(app.state, "evaluator", None)
 
-    # 1. Prometheus counters / confidence histogram
     model_label = (
         _LLM_CFG.get("gemini_model", "gemini-2.0-flash")
         if _LLM_CFG.get("provider", "groq") == "gemini"
         else _LLM_CFG.get("model", "llama-3.3-70b-versatile")
     )
-    REQUEST_COUNTER.labels(endpoint="run", status="success").inc()
-    for i, qr in enumerate(query_results):
-        ev = qr.get("evaluation", {})
-        conf = float(ev.get("confidence", 0.0))
-        LLM_CONFIDENCE.labels(model=model_label).observe(conf)
 
-        # Token metrics
-        p_tok = int(ev.get("prompt_tokens", 0))
-        c_tok = int(ev.get("completion_tokens", 0))
-        if p_tok or c_tok:
-            inc_tokens(model_label, p_tok, c_tok)
-
-        # Empty retrieval counter
-        if not qr.get("search_results"):
-            EMPTY_RETRIEVAL_COUNTER.inc()
-
-    # Stage timing histograms
-    for stage_key, prom_label in [
-        ("pdf", "pdf"), ("embedding", "embed"), ("queries", "llm")
-    ]:
-        dur = timings.get(stage_key, 0.0)
-        if dur > 0:
-            from src.ops.metrics import PIPELINE_DURATION
-            PIPELINE_DURATION.labels(stage=prom_label).observe(dur)
-
-    # 2. Alert checks
-    if _alerts:
-        _alerts.check_latency(total_time, performance_stats, session_id or "")
-        for i, (q, qr) in enumerate(zip(queries, query_results)):
-            svecs = qr.get("search_results", [])
-            _alerts.check_retrieval(svecs, q, pdf_filename, session_id or "")
-            ev    = qr.get("evaluation", {})
-            conf  = float(ev.get("confidence", 0.0))
-            ans   = ev.get("answer", "")
-            _alerts.check_confidence(conf, q, pdf_filename, ans, session_id or "")
-
-    # 3. RAGAS evaluation (fire-and-forget background thread)
+    # ── 3. RAGAS evaluation ──────────────────────────────────────────────
+    all_evals = []
     if _evaluator and _OPS_EVAL.get("enabled", True):
-        def _on_eval_done(metrics: dict):
-            if _alerts:
-                for q in queries:
-                    _alerts.check_eval_metrics(metrics, q, pdf_filename, session_id or "")
-            if _tracker:
-                import threading as _th
-                pass  # metrics will be added to MLflow via the tracker call below
-
         for i, (q, qr) in enumerate(zip(queries, query_results)):
-            ev   = qr.get("evaluation", {})
+            ev    = qr.get("evaluation", {})
             svecs = qr.get("search_results", [])
-            emb  = all_embs[i] if i < len(all_embs) else None
-            _evaluator.evaluate_async(
-                query=q,
-                query_embedding=emb,
-                answer=ev.get("answer", ""),
-                context=ev.get("llm_context", ""),
-                source_vectors=svecs,
-                confidence=float(ev.get("confidence", 0.0)),
-                session_id=session_id or "",
-                pdf_filename=pdf_filename,
-                on_complete=_on_eval_done,
-            )
+            emb   = all_embs[i] if i < len(all_embs) else None
+            
+            if _TESTING_MODE:
+                # Sync eval for MLflow in testing mode
+                metrics = _evaluator.evaluate(
+                    query=q, query_embedding=emb, answer=ev.get("answer", ""),
+                    context=ev.get("llm_context", ""), source_vectors=svecs,
+                    confidence=float(ev.get("confidence", 0.0)),
+                    session_id=session_id or "test", pdf_filename=pdf_filename
+                )
+                all_evals.append(metrics)
+            else:
+                # Async eval for production
+                def _on_eval_done(m: dict):
+                    if _alerts: _alerts.check_eval_metrics(m, q, pdf_filename, session_id or "")
 
-    # 4. MLflow run log (first query as representative)
-    if _tracker and query_results:
-        first_ev  = query_results[0].get("evaluation", {})
-        total_p   = sum(int(qr.get("evaluation", {}).get("prompt_tokens", 0))     for qr in query_results)
-        total_c   = sum(int(qr.get("evaluation", {}).get("completion_tokens", 0)) for qr in query_results)
-        ct        = CostTracker(model=model_label)
-        ct.prompt_tokens     = total_p
-        ct.completion_tokens = total_c
+                _evaluator.evaluate_async(
+                    query=q, query_embedding=emb, answer=ev.get("answer", ""),
+                    context=ev.get("llm_context", ""), source_vectors=svecs,
+                    confidence=float(ev.get("confidence", 0.0)),
+                    session_id=session_id or "", pdf_filename=pdf_filename,
+                    on_complete=_on_eval_done,
+                )
+
+    # ── 4. Telemetry logging ─────────────────────────────────────────────
+    if _tracker and _TESTING_MODE and query_results:
+        # Aggregate eval metrics if available
+        avg_eval = {}
+        if all_evals:
+            for k in all_evals[0].keys():
+                avg_eval[k] = sum(e[k] for e in all_evals) / len(all_evals)
+
+        ct = CostTracker(model=model_label)
+        ct.prompt_tokens     = sum(int(qr.get("evaluation", {}).get("prompt_tokens", 0)) for qr in query_results)
+        ct.completion_tokens = sum(int(qr.get("evaluation", {}).get("completion_tokens", 0)) for qr in query_results)
+
+        print(f"📊 [Telemetry] queries={len(queries)} query_results={len(query_results)} all_evals={len(all_evals)}")
+        print(f"📊 [Telemetry] eval_metrics keys: {list(avg_eval.keys())}")
+
         _tracker.log_run(
             session_id=session_id or "unknown",
             user_id=user_id    or "unknown",
             endpoint="/hackrx/run",
-            pipeline_params={
-                "model":           model_label,
-                "embedding_model": _EMB_MODEL,
-                "top_k":           _RET_CFG.get("top_k", 5),
-                "chunk_size":      _CONFIG.get("chunking", {}).get("chunk_size", 1000),
-                "llm_provider":    _LLM_CFG.get("provider", "groq"),
-                "num_queries":     len(queries),
-            },
-            stage_timings={
-                "download": download_time,
-                **timings,
-            },
+            pipeline_params=_CONFIG,  # Now sends full config (flattened by tracker)
+            stage_timings={"download": download_time, **timings},
             token_usage=ct.summary(),
             eval_metrics={
-                "avg_confidence": sum(confidences) / len(confidences) if confidences else 0,
-            },
+                "avg_confidence": sum(confidences) / len(confidences) if confidences else 0.0,
+                **avg_eval
+            }
         )
+
+    if not _TESTING_MODE:
+        # Production Prometheus counters
+        REQUEST_COUNTER.labels(endpoint="run", status="success").inc()
+        for i, qr in enumerate(query_results):
+            ev = qr.get("evaluation", {})
+            LLM_CONFIDENCE.labels(model=model_label).observe(float(ev.get("confidence", 0.0)))
+            inc_tokens(model_label, int(ev.get("prompt_tokens", 0)), int(ev.get("completion_tokens", 0)))
+            if not qr.get("search_results"): EMPTY_RETRIEVAL_COUNTER.inc()
+
+        for stage_key, prom_label in [("pdf", "pdf"), ("embedding", "embed"), ("queries", "llm")]:
+            dur = timings.get(stage_key, 0.0)
+            if dur > 0: PIPELINE_DURATION.labels(stage=prom_label).observe(dur)
+        
+        if _alerts:
+            _alerts.check_latency(total_time, performance_stats, session_id or "")
+            for i, (q, qr) in enumerate(zip(queries, query_results)):
+                svecs = qr.get("search_results", [])
+                _alerts.check_retrieval(svecs, q, pdf_filename, session_id or "")
+                ev = qr.get("evaluation", {})
+                _alerts.check_confidence(float(ev.get("confidence", 0.0)), q, pdf_filename, ev.get("answer", ""), session_id or "")
 
     if _LOG_CFG.get("enabled", True):
         try:
@@ -968,6 +962,95 @@ async def query_pdf_upload(
     print(f"   🔍 Query Processing : {timings['queries']:.2f}s")
     print(f"   ⏱️  Total           : {total_time:.2f}s")
     print(f"{'='*60}\n")
+
+    # ── LLMOps instrumentation ────────────────────────────────────────────
+    _tracker   = getattr(app.state, "tracker", None)
+    _alerts    = getattr(app.state, "alerts", None)
+    _evaluator = getattr(app.state, "evaluator", None)
+
+    model_label = (
+        _LLM_CFG.get("gemini_model", "gemini-2.0-flash")
+        if _LLM_CFG.get("provider", "groq") == "gemini"
+        else _LLM_CFG.get("model", "llama-3.3-70b-versatile")
+    )
+
+    # ── 3. RAGAS evaluation ──────────────────────────────────────────────
+    all_evals = []
+    if _evaluator and _OPS_EVAL.get("enabled", True):
+        for i, (q, qr) in enumerate(zip(queries, query_results)):
+            ev    = qr.get("evaluation", {})
+            svecs = qr.get("search_results", [])
+            emb   = all_embs[i] if i < len(all_embs) else None
+            
+            if _TESTING_MODE:
+                # Sync eval for MLflow in testing mode
+                metrics = _evaluator.evaluate(
+                    query=q, query_embedding=emb, answer=ev.get("answer", ""),
+                    context=ev.get("llm_context", ""), source_vectors=svecs,
+                    confidence=float(ev.get("confidence", 0.0)),
+                    session_id=session_id or "test", pdf_filename=pdf_filename
+                )
+                all_evals.append(metrics)
+            else:
+                # Async eval for production
+                def _on_eval_done(m: dict):
+                    if _alerts: _alerts.check_eval_metrics(m, q, pdf_filename, session_id or "")
+
+                _evaluator.evaluate_async(
+                    query=q, query_embedding=emb, answer=ev.get("answer", ""),
+                    context=ev.get("llm_context", ""), source_vectors=svecs,
+                    confidence=float(ev.get("confidence", 0.0)),
+                    session_id=session_id or "", pdf_filename=pdf_filename,
+                    on_complete=_on_eval_done,
+                )
+
+    # ── 4. Telemetry logging ─────────────────────────────────────────────
+    if _tracker and _TESTING_MODE and query_results:
+        avg_eval = {}
+        if all_evals:
+            for k in all_evals[0].keys():
+                avg_eval[k] = sum(e[k] for e in all_evals) / len(all_evals)
+
+        ct = CostTracker(model=model_label)
+        ct.prompt_tokens     = sum(int(qr.get("evaluation", {}).get("prompt_tokens", 0)) for qr in query_results)
+        ct.completion_tokens = sum(int(qr.get("evaluation", {}).get("completion_tokens", 0)) for qr in query_results)
+
+        print(f"📊 [Telemetry] queries={len(queries)} query_results={len(query_results)} all_evals={len(all_evals)}")
+        print(f"📊 [Telemetry] eval_metrics keys: {list(avg_eval.keys())}")
+
+        _tracker.log_run(
+            session_id=session_id or "unknown",
+            user_id=user_id    or "unknown",
+            endpoint="/hackrx/run/upload",
+            pipeline_params=_CONFIG,
+            stage_timings={"download": download_time, **timings},
+            token_usage=ct.summary(),
+            eval_metrics={
+                "avg_confidence": sum(confidences) / len(confidences) if confidences else 0.0,
+                **avg_eval
+            }
+        )
+
+    if not _TESTING_MODE:
+        # Production Prometheus counters
+        REQUEST_COUNTER.labels(endpoint="upload", status="success").inc()
+        for i, qr in enumerate(query_results):
+            ev = qr.get("evaluation", {})
+            LLM_CONFIDENCE.labels(model=model_label).observe(float(ev.get("confidence", 0.0)))
+            inc_tokens(model_label, int(ev.get("prompt_tokens", 0)), int(ev.get("completion_tokens", 0)))
+            if not qr.get("search_results"): EMPTY_RETRIEVAL_COUNTER.inc()
+
+        for stage_key, prom_label in [("pdf", "pdf"), ("embedding", "embed"), ("queries", "llm")]:
+            dur = timings.get(stage_key, 0.0)
+            if dur > 0: PIPELINE_DURATION.labels(stage=prom_label).observe(dur)
+        
+        if _alerts:
+            _alerts.check_latency(total_time, performance_stats, session_id or "")
+            for i, (q, qr) in enumerate(zip(queries, query_results)):
+                svecs = qr.get("search_results", [])
+                _alerts.check_retrieval(svecs, q, pdf_filename, session_id or "")
+                ev = qr.get("evaluation", {})
+                _alerts.check_confidence(float(ev.get("confidence", 0.0)), q, pdf_filename, ev.get("answer", ""), session_id or "")
 
     return JSONResponse(content=response_data)
 

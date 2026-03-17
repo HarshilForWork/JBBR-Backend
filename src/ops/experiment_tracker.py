@@ -71,6 +71,19 @@ class ExperimentTracker:
         except Exception as exc:
             print(f"⚠️  [ExperimentTracker] DagsHub init failed: {exc} — tracking disabled.")
 
+    # ── Internal Helpers ───────────────────────────────────────────────────────
+
+    def _flatten_dict(self, d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
+        """Recursively flatten a nested dict into dot-separated keys."""
+        items: Dict[str, Any] = {}
+        for k, v in d.items():
+            new_key = f"{prefix}{k}"
+            if isinstance(v, dict):
+                items.update(self._flatten_dict(v, f"{new_key}."))
+            else:
+                items[new_key] = v
+        return items
+
     # ── Public API ─────────────────────────────────────────────────────────────
 
     def log_run(
@@ -91,7 +104,7 @@ class ExperimentTracker:
 
         Parameters
         ----------
-        pipeline_params : model, embedding_model, top_k, chunk_size, etc.
+        pipeline_params : full config.yaml or specific model/retrieval params
         stage_timings   : {"pdf": 8.2, "embed": 0.5, "llm": 2.6, ...}
         token_usage     : {"prompt_tokens": 1200, "completion_tokens": 300}
         eval_metrics    : {"confidence": 0.9, "faithfulness": 0.75, ...}
@@ -111,23 +124,33 @@ class ExperimentTracker:
                     "endpoint":   endpoint,
                 })
 
-                # ── Params ────────────────────────────────────────────────────
-                params = dict(pipeline_params)
+                # ── Params (Flattened) ────────────────────────────────────────
+                params = self._flatten_dict(pipeline_params)
                 if prompt_template:
                     params["prompt_version"] = _prompt_version(prompt_template)
                 mlflow.log_params(params)
 
                 # ── Stage timing metrics ─────────────────────────────────────
                 for stage, dur in stage_timings.items():
-                    mlflow.log_metric(f"latency_{stage}_s", round(dur, 3))
+                    if isinstance(dur, (int, float)):
+                        mlflow.log_metric(f"latency_{stage}_s", round(float(dur), 3))
 
                 # ── Token usage metrics ───────────────────────────────────────
                 for tok_key, tok_val in token_usage.items():
-                    mlflow.log_metric(tok_key, tok_val)
+                    if isinstance(tok_val, (int, float)):
+                        mlflow.log_metric(tok_key, float(tok_val))
 
                 # ── Evaluation / RAGAS metrics ────────────────────────────────
+                if eval_metrics:
+                    print(f"📊 [ExperimentTracker] Attempting to log {len(eval_metrics)} eval metrics...")
                 for metric_key, metric_val in eval_metrics.items():
-                    mlflow.log_metric(metric_key, round(float(metric_val), 4))
+                    # More robust check for numeric-like types
+                    try:
+                        f_val = float(metric_val)
+                        mlflow.log_metric(metric_key, round(f_val, 4))
+                    except (ValueError, TypeError):
+                        # Not a number, skip logging as metric
+                        pass
 
         except Exception as exc:
             print(f"⚠️  [ExperimentTracker] Failed to log run: {exc}")
